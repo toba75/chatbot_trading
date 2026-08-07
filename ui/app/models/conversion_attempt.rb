@@ -3,8 +3,19 @@ require "set"
 class ConversionAttempt < ApplicationRecord
   class MathQualificationNotRetryable < StandardError; end
 
+  scope :for_kept_documents, -> { joins(:document).merge(Document.kept) }
+  default_scope { for_kept_documents }
+
   belongs_to :document
-  has_many :math_qualifications, -> { order(:id) }, dependent: :destroy
+  has_many :math_qualifications, -> { for_kept_documents.order(:id) }, dependent: :destroy
+
+  def math_qualifications
+    if persisted? && !Document.kept.where(id: document_id).exists?
+      association(:math_qualifications).reset
+    end
+
+    association(:math_qualifications).reader
+  end
 
   enum :status, {
     staging: "staging",

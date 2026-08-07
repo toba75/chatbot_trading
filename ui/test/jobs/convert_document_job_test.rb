@@ -218,6 +218,55 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     assert_equal 0, client.calls
   end
 
+  test "refuse de convertir une tentative dont le document a été supprimé" do
+    attempt = create_attempt
+    attempt.document.discard!
+    client = FakeClient.new(successful_result)
+
+    assert_raises(ConvertDocumentJob::InvalidState) do
+      job_with(client).perform(attempt)
+    end
+
+    assert_equal 0, client.calls
+    assert_predicate ConversionAttempt.unscoped.find(attempt.id), :staging?
+  end
+
+  test "n'enregistre aucun artefact si le document est supprimé pendant Docling" do
+    attempt = create_attempt
+    client = DiscardingClient.new(attempt, successful_result)
+
+    assert_raises(ConvertDocumentJob::InvalidState) do
+      job_with(client).perform(attempt)
+    end
+
+    stored_attempt = ConversionAttempt.unscoped.find(attempt.id)
+    assert_predicate stored_attempt, :converting?
+    assert_not stored_attempt.docling_response.attached?
+    assert_not stored_attempt.docling_document.attached?
+    assert_empty MathQualification.unscoped.where(conversion_attempt_id: attempt.id)
+  end
+
+  test "purge les artefacts si le document est supprimé pendant leur stockage" do
+    attempt = create_attempt
+    job = job_with(FakeClient.new(successful_result))
+    original_attach = job.method(:attach)
+    first_attachment = true
+    job.define_singleton_method(:attach) do |attachment, content, filename, content_type|
+      original_attach.call(attachment, content, filename, content_type)
+      if first_attachment
+        first_attachment = false
+        Document.with_discarded.find(attempt.document_id).discard!
+      end
+    end
+
+    assert_raises(ConvertDocumentJob::InvalidState) { job.perform(attempt) }
+
+    stored_attempt = ConversionAttempt.unscoped.find(attempt.id)
+    assert_not stored_attempt.docling_response.attached?
+    assert_not stored_attempt.docling_document.attached?
+    assert_empty MathQualification.unscoped.where(conversion_attempt_id: attempt.id)
+  end
+
   test "une ancienne exécution ne peut pas écraser un état terminal" do
     attempt = create_attempt
     job = job_with(FakeClient.new(successful_result))
@@ -292,6 +341,18 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
       raise @error if @error
 
       @result
+    end
+  end
+
+  class DiscardingClient < FakeClient
+    def initialize(attempt, result)
+      super(result)
+      @attempt = attempt
+    end
+
+    def convert(**_arguments)
+      Document.with_discarded.find(@attempt.document_id).discard!
+      super
     end
   end
 

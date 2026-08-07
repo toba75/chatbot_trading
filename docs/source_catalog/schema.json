@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chatbot-trading.local/source-catalog/v1",
+  "title": "Registre de sources du corpus RAG",
+  "type": "object",
+  "required": ["schema_version", "documents"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "manifest_sha256": {"type": ["string", "null"]},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "documents": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/document"}
+    }
+  },
+  "$defs": {
+    "proof": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["source_text", "provider", "manual"]},
+        "provider": {"type": "string"},
+        "resource_id": {"type": "string"},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "locator": {"type": "object"},
+        "reviewer": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "candidate": {
+      "type": "object",
+      "required": ["candidate_id", "status"],
+      "properties": {
+        "candidate_id": {"type": "string"},
+        "status": {"enum": ["candidate", "accepted", "ambiguous", "rejected"]},
+        "rating": {
+          "type": ["object", "null"],
+          "required": ["average", "count"],
+          "properties": {
+            "average": {"type": "number", "minimum": 0, "maximum": 5},
+            "count": {"type": "integer", "minimum": 0}
+          }
+        },
+        "proof": {"$ref": "#/$defs/proof"}
+      },
+      "additionalProperties": true
+    },
+    "document": {
+      "type": "object",
+      "required": [
+        "source_sha256", "file_name", "document_kind", "lookup", "bibliography",
+        "temporality", "provider_observations", "resolution", "editorial_review",
+        "commercial_observations"
+      ],
+      "properties": {
+        "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "file_name": {"type": "string"},
+        "document_kind": {"enum": ["book", "article", "working_paper", "unknown"]},
+        "lookup": {"type": "object", "required": ["title", "authors", "identifiers"]},
+        "bibliography": {"type": "object", "required": ["identifiers", "provenance"]},
+        "temporality": {"type": "object"},
+        "provider_observations": {"type": "array"},
+        "resolution": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {"enum": ["not_queried", "candidate", "accepted", "ambiguous", "rejected", "no_match", "unavailable"]}
+          }
+        },
+        "editorial_review": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {"status": {"enum": ["reviewed", "not_assessable"]}
+          }
+        },
+        "commercial_observations": {"type": "array"}
+      },
+      "additionalProperties": true
+    }
+  }
+}

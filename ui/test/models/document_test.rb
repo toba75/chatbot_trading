@@ -114,6 +114,59 @@ class DocumentTest < ActiveSupport::TestCase
     assert_equal({ key: "qualification_failed", label: "Échec qualification" }, document.processing_status)
   end
 
+  test "distingue les documents conservés et supprimés sans toucher au PDF" do
+    document = Document.create_from_pdf!(uploaded_file(REFERENCE_PDF))
+    document.start_conversion!(conversion_options: { "pipeline" => "vlm" })
+
+    assert_includes Document.kept, document
+    assert_empty Document.discarded
+
+    document.discard!
+
+    assert_predicate document, :discarded?
+    assert_predicate document, :deleted?
+    assert_not_includes Document.kept, document
+    assert_includes Document.discarded, document
+    assert_equal File.binread(REFERENCE_PDF), document.reload.source_pdf.download
+    assert_empty document.conversion_attempts
+    assert_equal 1, ConversionAttempt.unscoped.where(document_id: document.id).count
+  end
+
+  test "ne rend plus visibles les tentatives d'un document supprimé" do
+    document = Document.create_from_pdf!(uploaded_file(REFERENCE_PDF))
+    attempt = document.start_conversion!(conversion_options: { "pipeline" => "vlm" })
+    stale_document = Document.find(document.id)
+    stale_document.conversion_attempts.load
+
+    document.discard!
+
+    assert_empty document.reload.conversion_attempts
+    assert_empty stale_document.conversion_attempts
+    assert_empty ConversionAttempt.where(id: attempt.id)
+    assert_equal 1, ConversionAttempt.unscoped.where(id: attempt.id).count
+  end
+
+  test "restaure un document supprimé" do
+    document = Document.create_from_pdf!(uploaded_file(REFERENCE_PDF))
+    document.discard!
+
+    assert document.undiscard!
+    assert_not_predicate document.reload, :discarded?
+    assert_includes Document.kept, document
+    assert_empty Document.discarded
+  end
+
+  test "actualise la liste temps réel lors de la suppression et de la restauration" do
+    document = Document.create_from_pdf!(uploaded_file(REFERENCE_PDF))
+    broadcasts = []
+    document.define_singleton_method(:broadcast_refresh_later_to) { |stream| broadcasts << stream }
+
+    document.discard!
+    document.undiscard!
+
+    assert_equal [ "documents", "documents" ], broadcasts
+  end
+
   test "déclare le document terminé seulement après une qualification réussie" do
     document = Document.create_from_pdf!(uploaded_file(REFERENCE_PDF))
     attempt = document.start_conversion!(conversion_options: { "pipeline" => "vlm" })

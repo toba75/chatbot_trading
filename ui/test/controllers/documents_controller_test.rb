@@ -105,6 +105,18 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "copie.pdf a déjà été importé.", flash[:alert]
   end
 
+  test "ignore un PDF déjà placé dans la corbeille" do
+    document, = create_document_with_attempt(uploaded_file(filename: "original.pdf"))
+    document.discard!
+
+    assert_no_difference -> { Document.with_discarded.count } do
+      post documents_path, params: { document: { source_pdfs: [ uploaded_file(filename: "copie.pdf") ] } }
+    end
+
+    assert_redirected_to documents_path
+    assert_equal "copie.pdf a déjà été importé.", flash[:alert]
+  end
+
   test "importe les PDF nouveaux et signale les doublons du même lot" do
     assert_difference -> { Document.count }, 1 do
       assert_difference -> { ConversionAttempt.count }, 1 do
@@ -290,7 +302,7 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_response :conflict
   end
 
-  test "affiche le PDF et un seul format Docling sélectionnable par onglets" do
+  test "affiche le PDF et les quatre formats Docling sélectionnables par onglets" do
     document, = completed_document
 
     get document_path(document)
@@ -299,14 +311,16 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(section[data-controller="page-sync"])
     assert_select %(canvas[title="Page courante du PDF original"])
     assert_select %(nav[aria-label="Navigation dans le PDF original"] input[value="1"])
-    assert_select %(nav[aria-label="Formats Docling"] a[role="tab"]), count: 5
+    assert_select %(header.document-heading)
+    assert_select %(figure.document-thumbnail canvas[title="Première page du PDF original"])
+    assert_select %(nav[aria-label="Sections du document"] button[role="tab"]), count: 2
+    assert_select %(nav[aria-label="Formats Docling"] a[role="tab"]), count: 4
     assert_select %(a[role="tab"][hidden]), text: "HTML corrigé"
-    assert_select %(a[role="tab"][hidden]), text: "HTML natif paginé"
     assert_select %(a[role="tab"][href="#{docling_page_preview_document_path(document, page: 1)}"]), text: "JSON"
-    assert_select %(a[role="tab"][aria-selected="true"]), text: "HTML natif exact"
+    assert_select %(a[role="tab"][aria-selected="true"]), text: "HTML original"
     assert_select %(section[data-page-sync-html-synchronized-value="false"])
-    assert_select %(a[data-page-sync-target~="htmlTab"][href="#{html_preview_document_path(document)}"]), text: "HTML natif exact"
-    assert_select %(iframe[title="HTML natif exact"][sandbox=""]), count: 1
+    assert_select %(a[data-page-sync-target~="htmlTab"][href="#{html_preview_document_path(document)}"]), text: "HTML original"
+    assert_select %(iframe[title="HTML original"][sandbox=""]), count: 1
     assert_select %(iframe[src="#{html_preview_document_path(document)}"]), count: 1
     assert_select %([data-page-sync-target="htmlSyncNotice"]), text: /synchronisation HTML par page/
     assert_not_includes response.body, "&lt;script&gt;résumé&lt;/script&gt;"
@@ -315,6 +329,74 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
       text: "5"
     assert_select ".quality-summary", count: 0
     assert_select ".page-details", count: 0
+  end
+
+  test "masque les documents supprimés dans la bibliothèque" do
+    active, = create_document_with_attempt
+    deleted, = create_document_with_attempt
+    deleted.discard!
+
+    get documents_path
+
+    assert_response :success
+    assert_select "a.document-link[href='#{document_path(active)}']"
+    assert_select "a.document-link[href='#{document_path(deleted)}']", count: 0
+    assert_select "a[href='#{trash_documents_path}']", text: "Corbeille"
+  end
+
+  test "déplace un document dans la corbeille sans supprimer ses données" do
+    document, attempt = create_document_with_attempt
+
+    assert_no_difference -> { Document.with_discarded.count } do
+      delete document_path(document)
+    end
+
+    assert_redirected_to documents_path
+    assert_includes flash[:notice], "corbeille"
+    assert_predicate document.reload, :discarded?
+    assert_predicate ConversionAttempt.unscoped.find(attempt.id), :persisted?
+    assert_equal 1, document.source_pdf.attachments.count
+  end
+
+  test "affiche et restaure un document depuis la corbeille" do
+    document, = create_document_with_attempt
+    document.discard!
+
+    get trash_documents_path
+
+    assert_response :success
+    assert_select %(main[data-cable-reconcile-url-value="#{trash_documents_path}"])
+    assert_select "h1", text: "Documents supprimés"
+    assert_select ".document-link--static"
+    assert_select "a.document-link[href='#{document_path(document)}']", count: 0
+    assert_select "form[action='#{restore_document_path(document)}']"
+
+    post restore_document_path(document)
+
+    assert_redirected_to trash_documents_path
+    assert_not_predicate document.reload, :discarded?
+    assert_includes flash[:notice], "restauré"
+  end
+
+  test "ne rend pas un document supprimé accessible par son URL" do
+    document, = create_document_with_attempt
+    document.discard!
+
+    get document_path(document)
+
+    assert_response :not_found
+  end
+
+  test "réaffiche le document parent si seule sa tentative de relance est supprimée" do
+    parent, = create_document_with_attempt
+    child, = create_document_with_attempt
+    child.update!(retried_from: parent)
+    child.discard!
+
+    get documents_path
+
+    assert_response :success
+    assert_select "a.document-link[href='#{document_path(parent)}']"
   end
 
   test "n'affiche aucune synthèse quand aucune page ne semble vide" do
@@ -333,6 +415,118 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".conversion-warning", count: 0
     assert_select ".quality-summary", count: 0
     assert_select ".page-details", count: 0
+  end
+
+  test "affiche les champs bibliographiques portés par le document" do
+    document, = completed_document
+    document.update!(metadata: {
+      "schema_version" => 1,
+      "bibliography" => {
+        "title" => "Advances in Financial Machine Learning",
+        "authors" => [ "Marcos Lopez de Prado" ],
+        "publication_date" => "2018-02-21",
+        "publication_year" => "2018",
+        "publisher" => "John Wiley & Sons",
+        "language" => "en",
+        "identifiers" => { "isbn13" => [ "9781119482086" ] },
+        "rating" => { "average" => 5.0, "count" => 1 }
+      },
+      "enrichment" => {
+        "provider" => "google_books",
+        "status" => "accepted",
+        "volume_id" => "oU9KDwAAQBAJ",
+        "observed_at" => "2026-08-07T15:11:33Z"
+      }
+    })
+
+    get document_path(document)
+
+    assert_response :success
+    assert_select "header.document-heading h1", text: "Advances in Financial Machine Learning"
+    assert_select ".document-bibliography dd", text: "Marcos Lopez de Prado"
+    assert_select ".document-bibliography dd", text: "2018"
+    assert_select "#document-metadata-panel .metadata-provenance", text: /enrichies depuis Google Books/
+    assert_select "#document-metadata-panel .metadata-grid dd", text: /2018-02-21/
+    assert_select "#document-metadata-panel .metadata-grid dd", text: /5\.0\/5 \(1 vote\)/
+    assert_select "#document-metadata-panel form[action='#{enrich_metadata_document_path(document)}']"
+  end
+
+  test "affiche les candidats Google Books et confirme uniquement le volume sélectionné" do
+    document, = completed_document
+    document.update!(metadata: {
+      "bibliography" => { "publisher" => "Éditeur conservé" },
+      "enrichment" => {
+        "provider" => "google_books",
+        "status" => "ambiguous",
+        "candidates" => [
+          {
+            "volume_id" => "gb-1", "title" => "Titre A", "authors" => [ "Auteur A" ],
+            "publisher" => "Éditeur A", "published_date" => "2020",
+            "identifiers" => { "isbn13" => [ "111" ] }, "rating" => { "average" => 4.0, "count" => 3 }, "score" => 0.9
+          },
+          {
+            "volume_id" => "gb-2", "title" => "Titre B", "authors" => [ "Auteur B" ],
+            "publisher" => "Éditeur B", "published_date" => "2021",
+            "identifiers" => { "isbn13" => [ "222" ] }, "score" => 0.9
+          }
+        ]
+      }
+    })
+
+    get document_path(document)
+
+    assert_select "section.metadata-candidates"
+    assert_select "form[action='#{confirm_metadata_document_path(document)}'] input[name='metadata_confirmation[volume_id]'][value='gb-1']"
+    assert_select "form[action='#{confirm_metadata_document_path(document)}'] input[name='metadata_confirmation[volume_id]'][value='gb-2']"
+    assert_select "form[action='#{reject_metadata_document_path(document)}']"
+
+    post confirm_metadata_document_path(document), params: {
+      metadata_confirmation: { volume_id: "gb-2", title: "valeur injectée" }
+    }
+
+    assert_redirected_to document_path(document)
+    document.reload
+    assert_equal "accepted", document.metadata.dig("enrichment", "status")
+    assert_equal "manual", document.metadata.dig("enrichment", "resolution")
+    assert_equal "gb-2", document.metadata.dig("enrichment", "volume_id")
+    assert_equal "Titre B", document.metadata.dig("bibliography", "title")
+  end
+
+  test "présente une correspondance unique comme à confirmer" do
+    document, = completed_document
+    document.update!(metadata: {
+      "enrichment" => {
+        "status" => "ambiguous",
+        "candidates" => [
+          {
+            "volume_id" => "gb-unique", "title" => "Titre unique", "authors" => [ "Auteur" ],
+            "publisher" => "Éditeur", "published_date" => "2024", "score" => 0.9
+          }
+        ]
+      }
+    })
+
+    get document_path(document)
+
+    assert_select "#document-metadata-panel .metadata-provenance", text: /à confirmer/
+    assert_select "#document-metadata-panel .metadata-status", text: /Une correspondance est proposée/
+    assert_select "section.metadata-candidates input[value='gb-unique']"
+  end
+
+  test "rejette les candidats Google Books sans effacer la bibliographie existante" do
+    document, = completed_document
+    document.update!(metadata: {
+      "bibliography" => { "title" => "Titre local" },
+      "enrichment" => { "status" => "ambiguous", "candidates" => [ { "volume_id" => "gb-1" } ] }
+    })
+
+    post reject_metadata_document_path(document)
+
+    assert_redirected_to document_path(document)
+    document.reload
+    assert_equal "no_match", document.metadata.dig("enrichment", "status")
+    assert_equal "manual_rejection", document.metadata.dig("enrichment", "resolution")
+    assert_equal "Titre local", document.metadata.dig("bibliography", "title")
   end
 
   test "sert l'HTML exact avec une politique de confinement" do
@@ -374,7 +568,7 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
 
     assert_select %(section[data-page-sync-html-url-value="#{page_html_preview_document_path(document)}"])
     assert_select %(section[data-page-sync-html-synchronized-value="true"])
-    assert_select %([data-controller="page-html-availability"][data-page-html-availability-url-value="#{page_html_preview_document_path(document)}"][data-page-html-availability-label-value="HTML natif paginé"][data-page-html-availability-corrected-value="false"])
+    assert_select %([data-controller="page-html-availability"][data-page-html-availability-url-value="#{page_html_preview_document_path(document)}"][data-page-html-availability-label-value="HTML original"][data-page-html-availability-corrected-value="false"])
     assert_select %(iframe[src="#{page_html_preview_document_path(document)}#page-1"])
     assert_select %([data-page-sync-target="htmlSyncNotice"][hidden])
 
@@ -477,11 +671,10 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
 
     get document_path(document)
 
-    assert_select %(nav[aria-label="Formats Docling"] a[role="tab"]), count: 5
-    assert_select %(a[data-page-sync-target~="htmlTab"]), count: 3
+    assert_select %(nav[aria-label="Formats Docling"] a[role="tab"]), count: 4
+    assert_select %(a[data-page-sync-target~="htmlTab"]), count: 2
     assert_select %(a[aria-selected="true"][href="#{derived_html_preview_document_path(document)}"]), text: "HTML corrigé"
-    assert_select %(a[href="#{page_html_preview_document_path(document)}"]), text: "HTML natif paginé"
-    assert_select %(a[href="#{html_preview_document_path(document)}"]), text: "HTML natif exact"
+    assert_select %(a[href="#{page_html_preview_document_path(document)}"]), text: "HTML original"
     assert_select %([data-page-html-availability-corrected-value="true"])
     assert_select %(iframe[src="#{derived_html_preview_document_path(document)}#page-1"]), count: 1
     assert_select ".math-correction", text: /onglet « HTML corrigé »/

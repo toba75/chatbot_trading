@@ -1,6 +1,23 @@
 require "test_helper"
 
 class MathQualificationTest < ActiveSupport::TestCase
+  test "ne rend plus visible une qualification lorsque son document est supprimé" do
+    attempt = conversion_attempt
+    qualification = MathQualification.build_for(
+      attempt,
+      docling_document_sha256: "b" * 64
+    )
+    qualification.save!
+    stale_attempt = ConversionAttempt.find(attempt.id)
+    stale_attempt.math_qualifications.load
+    attempt.document.discard!
+
+    assert_empty attempt.math_qualifications
+    assert_empty stale_attempt.math_qualifications
+    assert_empty MathQualification.where(id: qualification.id)
+    assert_equal 1, MathQualification.unscoped.where(id: qualification.id).count
+  end
+
   test "construit une qualification déterministe pour les deux entrées exactes" do
     attempt = conversion_attempt
 

@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import * as pdfjsLib from "pdfjs-dist"
 
 export default class extends Controller {
-  static targets = ["canvas", "viewer", "page", "total", "previous", "next", "status", "htmlTab", "correctedHtmlTab", "nativeHtmlTab", "jsonTab", "doclingPreview", "htmlSyncNotice"]
+  static targets = ["canvas", "viewer", "page", "total", "previous", "next", "status", "htmlTab", "correctedHtmlTab", "originalHtmlTab", "jsonTab", "doclingPreview", "htmlSyncNotice"]
   static values = { pdfUrl: String, htmlUrl: String, htmlSynchronized: Boolean, jsonUrl: String, pageCount: Number, workerUrl: String }
 
   async connect() {
@@ -61,7 +61,7 @@ export default class extends Controller {
   useHtmlUrl(event) {
     this.htmlUrlValue = event.detail.url
     this.htmlSynchronizedValue = true
-    const tab = event.detail.corrected ? this.correctedHtmlTabTarget : this.nativeHtmlTabTarget
+    const tab = event.detail.corrected ? this.correctedHtmlTabTarget : this.originalHtmlTabTarget
     tab.hidden = false
     tab.dataset.pageSyncBaseUrl = event.detail.url
     tab.dataset.pageSyncSynchronized = "true"
@@ -122,6 +122,10 @@ export default class extends Controller {
       if (version === this.renderVersion) this.showError(`La page ${pageNumber} n’a pas pu être affichée.`)
       console.error(error)
     }
+  }
+
+  refresh() {
+    if (this.pdf && !this.incompatiblePageCounts) this.showPage(this.currentPage)
   }
 
   updateNavigation() {

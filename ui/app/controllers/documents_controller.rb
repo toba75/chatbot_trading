@@ -3,10 +3,14 @@ class DocumentsController < ApplicationController
   SOURCE_UPLOAD_ERRORS = [ ActiveStorage::IntegrityError, IOError, SystemCallError ].freeze
 
   def index
-    retried_document_ids = Document.where.not(retried_from_id: nil).select(:retried_from_id)
-    @documents = Document.where.not(id: retried_document_ids)
-      .includes(conversion_attempts: :math_qualifications, source_pdf_attachment: :blob)
-      .order(created_at: :desc, id: :desc)
+    @deleted_view = false
+    @documents = listed_documents(Document.kept)
+  end
+
+  def trash
+    @deleted_view = true
+    @documents = listed_documents(Document.with_discarded.discarded)
+    render :index
   end
 
   def new
@@ -36,7 +40,7 @@ class DocumentsController < ApplicationController
   end
 
   def show
-    @document = Document.find(params[:id])
+    @document = kept_document
     @attempt = @document.current_attempt
     @previous_attempts = @document.attempt_history.where.not(id: @attempt.id)
     @math_qualification = @attempt.current_math_qualification
@@ -46,7 +50,7 @@ class DocumentsController < ApplicationController
   end
 
   def retry_conversion
-    document = Document.find(params[:id])
+    document = kept_document
     attempt = Document.transaction do
       document.retry_conversion!(conversion_options: DoclingClient.conversion_options)
     end
@@ -57,7 +61,7 @@ class DocumentsController < ApplicationController
   end
 
   def retry_math_qualification
-    document = Document.find(params[:id])
+    document = kept_document
     qualification = document.current_attempt.retry_math_qualification! { |_qualification| }
     enqueue_math_qualification_or_mark_failed!(qualification)
     redirect_to document
@@ -65,8 +69,46 @@ class DocumentsController < ApplicationController
     head :conflict
   end
 
+  def enrich_metadata
+    document = kept_document
+    metadata = GoogleBooksMetadataEnricher.call(document)
+    document.update!(metadata: metadata)
+    status = metadata.dig("enrichment", "status")
+    redirect_to document, **metadata_enrichment_flash(status)
+  end
+
+  def confirm_metadata
+    document = kept_document
+    volume_id = params.require(:metadata_confirmation).permit(:volume_id).fetch(:volume_id)
+    metadata = GoogleBooksMetadataEnricher.confirm(document, volume_id: volume_id)
+    document.update!(metadata: metadata)
+    redirect_to document, notice: "La correspondance Google Books a été confirmée."
+  rescue ActionController::ParameterMissing, GoogleBooksMetadataEnricher::CandidateNotFound
+    redirect_to document, alert: "Cette correspondance Google Books n’est plus disponible."
+  end
+
+  def reject_metadata
+    document = kept_document
+    document.update!(metadata: GoogleBooksMetadataEnricher.reject(document))
+    redirect_to document, alert: "Aucune correspondance Google Books n’a été retenue."
+  rescue GoogleBooksMetadataEnricher::CandidateNotFound
+    redirect_to document, alert: "Aucune correspondance Google Books à confirmer ou rejeter n’est disponible."
+  end
+
+  def destroy
+    document = kept_document
+    document.discard!
+    redirect_to documents_path, notice: "Le document a été déplacé dans la corbeille."
+  end
+
+  def restore
+    document = Document.with_discarded.discarded.find(params[:id])
+    document.undiscard!
+    redirect_to trash_documents_path, notice: "Le document a été restauré."
+  end
+
   def html_preview
-    document = Document.find(params[:id])
+    document = kept_document
     attempt = document.current_attempt
     return head :conflict unless attempt.succeeded? && attempt.html.attached?
 
@@ -75,7 +117,7 @@ class DocumentsController < ApplicationController
   end
 
   def page_html_preview
-    document = Document.find(params[:id])
+    document = kept_document
     qualification = document.current_attempt.current_math_qualification
     return head :conflict unless qualification&.succeeded? && qualification.native_page_html.attached?
 
@@ -84,7 +126,7 @@ class DocumentsController < ApplicationController
   end
 
   def derived_html_preview
-    document = Document.find(params[:id])
+    document = kept_document
     attempt = document.current_attempt
     qualification = attempt.current_math_qualification
     return head :conflict unless attempt.succeeded? && qualification&.succeeded? && qualification.derived_html.attached?
@@ -94,7 +136,7 @@ class DocumentsController < ApplicationController
   end
 
   def markdown_preview
-    document = Document.find(params[:id])
+    document = kept_document
     attempt = document.current_attempt
     return head :conflict unless attempt.succeeded? && attempt.markdown.attached?
 
@@ -102,7 +144,7 @@ class DocumentsController < ApplicationController
   end
 
   def docling_preview
-    document = Document.find(params[:id])
+    document = kept_document
     attempt = document.current_attempt
     return head :conflict unless attempt.succeeded? && attempt.docling_document.attached?
 
@@ -110,7 +152,7 @@ class DocumentsController < ApplicationController
   end
 
   def docling_page_preview
-    document = Document.find(params[:id])
+    document = kept_document
     attempt = document.current_attempt
     return head :conflict unless attempt.succeeded? && attempt.docling_document.attached?
 
@@ -139,6 +181,17 @@ class DocumentsController < ApplicationController
 
   private
 
+  def kept_document
+    Document.kept.find(params[:id])
+  end
+
+  def listed_documents(scope)
+    retried_document_ids = Document.kept.where.not(retried_from_id: nil).select(:retried_from_id)
+    scope.where.not(id: retried_document_ids)
+      .includes(conversion_attempts: :math_qualifications, source_pdf_attachment: :blob)
+      .order(created_at: :desc, id: :desc)
+  end
+
   def source_pdfs
     document_params = params.require(:document)
     uploads = if document_params.key?(:source_pdfs)
@@ -166,7 +219,7 @@ class DocumentsController < ApplicationController
 
   def create_document_with_attempt!(candidate)
     source_sha256 = candidate.fetch(:source_sha256)
-    return :duplicate if Document.exists?(source_sha256: source_sha256)
+    return :duplicate if Document.with_discarded.exists?(source_sha256: source_sha256)
 
     document = nil
     attempt = nil
@@ -177,7 +230,7 @@ class DocumentsController < ApplicationController
     attempt
 
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
-    raise unless defined?(source_sha256) && Document.exists?(source_sha256: source_sha256)
+    raise unless defined?(source_sha256) && Document.with_discarded.exists?(source_sha256: source_sha256)
 
     :duplicate
   rescue *SOURCE_UPLOAD_ERRORS => error
@@ -313,6 +366,20 @@ class DocumentsController < ApplicationController
       elsif qualification.queued? && qualification.execution_job_id.blank?
         qualification.update!(execution_job_id: job.job_id)
       end
+    end
+  end
+
+  def metadata_enrichment_flash(status)
+    if status == "accepted"
+      { notice: "Les métadonnées bibliographiques ont été enrichies depuis Google Books." }
+    elsif status == "ambiguous"
+      { alert: "Google Books propose des correspondances à vérifier : aucune métadonnée n’a été promue automatiquement." }
+    elsif status == "review_required"
+      { alert: "Google Books propose une correspondance à confirmer : aucune métadonnée n’a été promue automatiquement." }
+    elsif status == "no_match"
+      { alert: "Aucune correspondance Google Books suffisamment fiable n’a été trouvée." }
+    else
+      { alert: "L’enrichissement Google Books a échoué ; le détail est conservé dans les métadonnées." }
     end
   end
 end

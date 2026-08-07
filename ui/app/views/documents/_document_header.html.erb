@@ -1,0 +1,37 @@
+<% metadata = document.bibliographic_metadata %>
+<% title = metadata["title"].presence || "Titre non renseigné" %>
+<% authors = Array(metadata["authors"]) %>
+<% author_label = authors.presence&.to_sentence || "Auteur non renseigné" %>
+<% year_label = metadata["publication_year"].presence || "Année non renseignée" %>
+
+<header class="document-heading">
+  <figure
+    class="document-thumbnail"
+    data-controller="pdf-thumbnail"
+    data-pdf-thumbnail-pdf-url-value="<%= rails_blob_path(document.source_pdf, disposition: "inline") %>"
+    data-pdf-thumbnail-worker-url-value="<%= asset_path("pdfjs/pdf.worker.min.js") %>"
+  >
+    <div class="document-thumbnail__frame">
+      <p data-pdf-thumbnail-target="status">Chargement de la première page…</p>
+      <canvas title="Première page du PDF original" data-pdf-thumbnail-target="canvas"></canvas>
+    </div>
+    <figcaption>Première page du PDF original</figcaption>
+  </figure>
+
+  <div class="document-heading__identity">
+    <p class="eyebrow">Conversion Docling</p>
+    <h1><%= title %></h1>
+    <p class="document-source-filename"><%= document.source_pdf.filename %></p>
+    <dl class="document-bibliography" aria-label="Identité bibliographique">
+      <div>
+        <dt>Auteur</dt>
+        <dd><%= author_label %></dd>
+      </div>
+      <div>
+        <dt>Année de publication</dt>
+        <dd><%= year_label %></dd>
+      </div>
+    </dl>
+    <p class="lead">Document <%= document.id %></p>
+  </div>
+</header>

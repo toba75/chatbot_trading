@@ -25,11 +25,12 @@ class QualifyMathJob < ApplicationJob
   self.enqueue_after_transaction_commit = true
 
   def perform(qualification)
+    ensure_document_kept!(qualification)
     return unless begin_qualification!(qualification)
-    result = open_inputs(qualification) do |source, document|
+    result = open_inputs(qualification) do |source, document, source_filename|
       math_qualification_client.qualify(
         source_file: source,
-        source_filename: qualification.conversion_attempt.document.source_pdf.filename.to_s,
+        source_filename: source_filename,
         document_file: document,
         source_sha256: qualification.source_sha256,
         docling_document_sha256: qualification.docling_document_sha256
@@ -54,36 +55,40 @@ class QualifyMathJob < ApplicationJob
   def begin_qualification!(qualification)
     interrupted = false
     started = false
-    qualification.with_lock do
-      if qualification_waiting_for_job?(qualification) && !qualification.current_contract?
-        qualification.update!(
-          status: "failed",
-          error_code: "obsolete_contract",
-          error_message: "Cette qualification historique doit être recréée avec le contrat courant.",
-          completed_at: Time.current
-        )
-      elsif qualification_ready_for_job?(qualification)
-        qualification.update!(
-          status: "running",
-          phase: "source_analysis",
-          completed_units: 0,
-          total_units: 1,
-          started_at: Time.current,
-          execution_job_id: job_id
-        )
-        started = true
-      elsif qualification.running? && qualification.execution_job_id == job_id
-        qualification.update!(
-          status: "failed",
-          error_code: "interrupted_execution",
-          error_message: "Le processus de qualification s'est arrêté avant de produire un résultat.",
-          completed_at: Time.current
-        )
-        interrupted = true
-      else
-        raise InvalidState, "La qualification #{qualification.id} n'est plus en attente."
+    persisted = with_kept_document(qualification) do
+      qualification.with_lock do
+        if qualification_waiting_for_job?(qualification) && !qualification.current_contract?
+          qualification.update!(
+            status: "failed",
+            error_code: "obsolete_contract",
+            error_message: "Cette qualification historique doit être recréée avec le contrat courant.",
+            completed_at: Time.current
+          )
+        elsif qualification_ready_for_job?(qualification)
+          qualification.update!(
+            status: "running",
+            phase: "source_analysis",
+            completed_units: 0,
+            total_units: 1,
+            started_at: Time.current,
+            execution_job_id: job_id
+          )
+          started = true
+        elsif qualification.running? && qualification.execution_job_id == job_id
+          qualification.update!(
+            status: "failed",
+            error_code: "interrupted_execution",
+            error_message: "Le processus de qualification s'est arrêté avant de produire un résultat.",
+            completed_at: Time.current
+          )
+          interrupted = true
+        else
+          raise InvalidState, "La qualification #{qualification.id} n'est plus en attente."
+        end
+        true
       end
     end
+    raise InvalidState, "La qualification appartient à un document supprimé." unless persisted
     return started unless interrupted
 
     raise InterruptedExecution, "La qualification #{qualification.id} interrompue a été rendue terminale."
@@ -102,46 +107,95 @@ class QualifyMathJob < ApplicationJob
       (qualification.execution_job_id.blank? || qualification.execution_job_id == job_id)
   end
 
+  def ensure_document_kept!(qualification)
+    return if document_for_qualification(qualification)&.kept?
+
+    raise InvalidState, "La qualification appartient à un document supprimé."
+  end
+
+  def document_for_qualification(qualification)
+    return unless qualification
+
+    attempt = ConversionAttempt.unscoped.find_by(id: qualification.conversion_attempt_id)
+    Document.with_discarded.find_by(id: attempt&.document_id)
+  end
+
+  def with_kept_document(qualification)
+    document = document_for_qualification(qualification)
+    return false unless document&.kept?
+
+    document.with_lock do
+      return false unless document.kept?
+
+      yield document
+    end
+  end
+
   def open_inputs(qualification)
-    qualification.conversion_attempt.document.source_pdf.open do |source|
-      qualification.conversion_attempt.docling_document.open do |document|
-        yield source, document
+    attempt = ConversionAttempt.unscoped.find_by(id: qualification.conversion_attempt_id)
+    document_record = document_for_qualification(qualification)
+    unless attempt && document_record&.kept?
+      raise InvalidState, "La qualification appartient à un document supprimé."
+    end
+
+    document_record.source_pdf.open do |source|
+      attempt.docling_document.open do |document|
+        yield source, document, document_record.source_pdf.filename.to_s
       end
     end
   end
 
   def persist_progress!(qualification, event)
-    qualification.with_lock do
-      ensure_active!(qualification)
-      qualification.update!(
-        status: "running",
-        phase: event.fetch("phase"),
-        completed_units: event.fetch("completed_units"),
-        total_units: event.fetch("total_units")
-      )
+    persisted = with_kept_document(qualification) do
+      qualification.with_lock do
+        ensure_active!(qualification)
+        qualification.update!(
+          status: "running",
+          phase: event.fetch("phase"),
+          completed_units: event.fetch("completed_units"),
+          total_units: event.fetch("total_units")
+        )
+      end
     end
+    raise InvalidState, "La qualification appartient à un document supprimé." unless persisted
   end
 
   def persist_result!(qualification, result)
+    ensure_document_kept!(qualification)
     summary, verdict = summarize(result.report, qualification, result)
-    qualification.with_lock do
-      ensure_active!(qualification)
-      qualification.update!(
-        phase: "persisting_result",
-        completed_units: 0,
-        total_units: 1
-      )
+    phase_persisted = with_kept_document(qualification) do
+      qualification.with_lock do
+        ensure_active!(qualification)
+        qualification.update!(
+          phase: "persisting_result",
+          completed_units: 0,
+          total_units: 1
+        )
+      end
     end
-    attach_result(qualification, result)
-    qualification.with_lock do
-      ensure_active!(qualification)
-      qualification.update!(
-        status: "succeeded",
-        verdict: verdict,
-        summary: summary,
-        completed_units: 1,
-        completed_at: Time.current
-      )
+    raise InvalidState, "La qualification appartient à un document supprimé." unless phase_persisted
+
+    attached_artifacts = Array(attach_result(qualification, result))
+    begin
+      persisted = with_kept_document(qualification) do
+        qualification.with_lock do
+          ensure_active!(qualification)
+          qualification.update!(
+            status: "succeeded",
+            verdict: verdict,
+            summary: summary,
+            completed_units: 1,
+            completed_at: Time.current
+          )
+        end
+      end
+    rescue InvalidState
+      purge_attachments!(attached_artifacts)
+      raise
+    end
+    unless persisted
+      purge_attachments!(attached_artifacts)
+      raise InvalidState, "La qualification appartient à un document supprimé."
     end
   end
 
@@ -630,30 +684,40 @@ class QualifyMathJob < ApplicationJob
   end
 
   def persist_failure!(qualification, error)
+    ready = with_kept_document(qualification) { qualification.with_lock { active?(qualification) } }
+    return unless ready
+    attached_artifacts = []
     output_error_message = nil
-    qualification.with_lock { return unless active?(qualification) }
     if error.result
       begin
-        attach_partial(qualification, error.result)
+        attached_artifacts = Array(attach_partial(qualification, error.result))
+      rescue InvalidState
+        raise
       rescue StandardError => output_error
         output_error_message = "Les preuves partielles n'ont pas pu être stockées : #{output_error.message}"
       end
     end
 
-    qualification.with_lock do
-      return unless active?(qualification)
-
-      qualification.update!(
-        status: "failed",
-        error_code: error.code,
-        error_message: [ error.message, output_error_message ].compact.join(" ").truncate(500),
-        completed_at: Time.current
-      )
+    persisted = with_kept_document(qualification) do
+      qualification.with_lock do
+        if active?(qualification)
+          qualification.update!(
+            status: "failed",
+            error_code: error.code,
+            error_message: [ error.message, output_error_message ].compact.join(" ").truncate(500),
+            completed_at: Time.current
+          )
+          true
+        else
+          false
+        end
+      end
     end
+    purge_attachments!(attached_artifacts) unless persisted
   end
 
   def ensure_active!(qualification)
-    return if active?(qualification)
+    return true if active?(qualification)
 
     raise InvalidState, "La qualification #{qualification.id} n'appartient plus à cette exécution."
   end
@@ -667,11 +731,24 @@ class QualifyMathJob < ApplicationJob
   end
 
   def attach_artifacts(qualification, result, partial:)
+    attached_artifacts = []
     RESULT_ARTIFACTS.each do |attachment_name, result_name, filename, content_type, required|
       content = result.public_send(result_name)
       next if content.blank? && (partial || !required)
 
-      attach(qualification.public_send(attachment_name), content, filename, content_type)
+      ensure_document_kept!(qualification)
+      attachment = qualification.public_send(attachment_name)
+      attach(attachment, content, filename, content_type)
+      attached_artifacts << attachment
+      ensure_document_kept!(qualification)
     end
+    attached_artifacts
+  rescue InvalidState
+    purge_attachments!(attached_artifacts)
+    raise
+  end
+
+  def purge_attachments!(attachments)
+    attachments.each { |attachment| attachment.purge if attachment.attached? }
   end
 end

@@ -1,0 +1,261 @@
+{
+  "candidate_states": {
+    "accepted": 22,
+    "ambiguous": 0,
+    "candidate": 2,
+    "rejected": 15
+  },
+  "consultations": {
+    "no_match": 0,
+    "succeeded": 37,
+    "unavailable": 1
+  },
+  "documents": [
+    {
+      "candidate_count": 0,
+      "consultation": "succeeded",
+      "resolution": "no_match",
+      "source_sha256": "7a3001e2de57c3e028a5d36bbcfaa7fb773ae3b77a144aaefcd4cc221b1de03d"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "5a93ef385b4216c7859bd8e17401195a3aa70f91583f37984f56121e33e93305"
+    },
+    {
+      "candidate_count": 0,
+      "consultation": "succeeded",
+      "resolution": "no_match",
+      "source_sha256": "a9458052d3dd31671406eaa75d21e3e7e32cb5817c19d6cafdd1950defcebf11"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "candidate",
+      "source_sha256": "9aff5d8d643604f1c7a414af82b6b97b4c55e9643655e2c8ecb42b0b9064189f"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "da9c5f99b6c1d3b1af1d82bef109d4d358620aa09be6f0c5d7c93b7ac9ea37a0"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "cf2215890cdd779fd97f5216d9fc04f68dbdda3bcec720d7a77274d4e2a2638a"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "7b4fe6cf42be3f207ff54420c6a3bb4110580118c11bb75036b4a919b7741b4e"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "36d6a460e07d0e66a2294f775d730052e284db5297dab156eda3ebaf7b20f797"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "8c536df8808f9e1988fa25795ee6774060cd8f0998d8ff5063f3c7ad16400475"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "rejected",
+      "source_sha256": "e3b5dcb43882a6372bc15978368528dc236388cae04d44253f4dc8e952b53e90"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "rejected",
+      "source_sha256": "58fa7c2fabbd8fa93ffbdf925fac282d890b793c935812252c96a7f29b44a04a"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "5dc0ce50d3b6f2ea2509e25205600dd0f2f0dc6a7ee66c777300bf52eaf0a7ad"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "c3596216a0bffe8f2b519ffb15cd035e645dbced05ba73133925be3c7ed5eb3a"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "032d54c949ea550e05878ce458e67f65f34faf2830ea9105ea7a15b6b8f5dd8c"
+    },
+    {
+      "candidate_count": 0,
+      "consultation": "succeeded",
+      "resolution": "no_match",
+      "source_sha256": "dc42c851d977c6b961c64fdf82a89356e140947cd549f6facf30b65fe0ce1ca3"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "ac101c48f631d2beee4ec4fa4a27c526efa5c0e20e9b02f00b5214107eba6c5a"
+    },
+    {
+      "candidate_count": 2,
+      "consultation": "succeeded",
+      "resolution": "rejected",
+      "source_sha256": "e7c1dcba5c3d86bb48c6ddea4591adf2669ec8368a64caf1ff2087beb6d553dc"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "e620456a6285f469779110ce06fc5e33bb31f624d869c07014bbe336e7311692"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "3715ceac073f5576f8adc243c1a1e8d835ae54b7060b04ac654eaf8fd489b5d8"
+    },
+    {
+      "candidate_count": 6,
+      "consultation": "succeeded",
+      "resolution": "rejected",
+      "source_sha256": "e3f57432a5f1d0e506867a0c273fb6ae72bc23a6d46c6d40d87a7aad98e6a881"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "94c0a6ca1a772f0daf99dca375db81ed34432e73dfdb28c6bdb7b681da8b7f02"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "efd718f770f8c4ece864580d7bde522be6e55aace0d3fb93cc49fc7b7add7a90"
+    },
+    {
+      "candidate_count": 0,
+      "consultation": "succeeded",
+      "resolution": "no_match",
+      "source_sha256": "0f7e74043e6039e94b634bff4d1f01964d0214f0bde59eabf109dbfcaefe7606"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "70ae7f6bf008badaaf9871bc8706452b719f9ee866262687a0b75017254e04e3"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "rejected",
+      "source_sha256": "78a4b443a64326a230a1cfe4142d5a2407f07619bba79a687ac6c08255341f51"
+    },
+    {
+      "candidate_count": 0,
+      "consultation": "succeeded",
+      "resolution": "no_match",
+      "source_sha256": "073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "8243ceb960361c57ab51059aa4c73bacb2e8c2de3d78289316e10939000292e6"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "00e4765c6f0b899319a4e113286e01ea4ab5c8f1d097edc107e24813304b7302"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "b01fb4c9ce3e1d1c22d4d33f808a3263d2d71d936ad88cf531222d0cca56eb75"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "bc853e10d9abec73ff9308dd7c9bc689f9758e58780f69dd04a2349f24329f06"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "rejected",
+      "source_sha256": "0fd2c69a1a978b61bcab0c3deddbec06cf472fc9d200539f96896bec90d31718"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "rejected",
+      "source_sha256": "11f9dc42c0495b58ddeece7e1f339c9a698b609264ffca13ff4f511979a70275"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "rejected",
+      "source_sha256": "b68e620f6f7b59ec2a35794f4c8040106b5bc92a31164aaad0bcb1435e457553"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "a7bae9c5fff794489a5496734a47e3a35fe793c0a27e1c1ae1018b17a22d911d"
+    },
+    {
+      "candidate_count": 0,
+      "consultation": "succeeded",
+      "resolution": "no_match",
+      "source_sha256": "b5f7e399ef9ede1ef301cad26a3800279d0c022e67daeb348425066ba61893e1"
+    },
+    {
+      "consultation": "unavailable",
+      "resolution": "unavailable",
+      "source_sha256": "1c7724b3b04d8f47dd66afdc46597402e80ffae8efca4cdf724ec4c1499ec09b"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "852846e02de0fa52742957be36866e8fcf29f5b14e3ef39115be3fe564f0515b"
+    },
+    {
+      "candidate_count": 1,
+      "consultation": "succeeded",
+      "resolution": "accepted",
+      "source_sha256": "bbb993ba14a288fed1d14163a082f1aa8333c626cfed1d6a2db55a6ed944f7c1"
+    }
+  ],
+  "documents_by_kind": {
+    "article": 2,
+    "book": 36
+  },
+  "identifier_coverage": {
+    "multiple_identifiers": 25,
+    "with_identifier": 31,
+    "without_identifier": 7
+  },
+  "observed_at": "2026-08-07T15:11:32+00:00",
+  "resolutions": {
+    "accepted": 22,
+    "ambiguous": 0,
+    "candidate": 1,
+    "no_match": 6,
+    "rejected": 8,
+    "unavailable": 1
+  },
+  "schema_version": 1
+}

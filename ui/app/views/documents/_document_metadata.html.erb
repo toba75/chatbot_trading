@@ -1,0 +1,181 @@
+<% metadata = document.bibliographic_metadata %>
+<% enrichment = document.metadata_enrichment %>
+<% status = enrichment["status"].presence || "not_enriched" %>
+<% review_candidate_ids = Array(enrichment["review_candidate_ids"]).map(&:to_s) %>
+<% candidates = Array(enrichment["candidates"]).select do |candidate|
+  candidate_id = candidate.is_a?(Hash) ? candidate["volume_id"].to_s : ""
+  candidate_id.present? &&
+    (review_candidate_ids.any? ? review_candidate_ids.include?(candidate_id) : candidate["score"].nil? || candidate["score"].to_f >= GoogleBooksMetadataEnricher::MIN_TITLE_SIMILARITY)
+end.uniq { |candidate| candidate["volume_id"] } %>
+<% reviewable = GoogleBooksMetadataEnricher::REVIEWABLE_STATUSES.include?(status) %>
+<% single_candidate_review = reviewable && candidates.one? %>
+<% status_label = {
+  "not_enriched" => "Métadonnées non enrichies",
+  "accepted" => "Métadonnées enrichies depuis Google Books",
+  "ambiguous" => "Correspondance Google Books ambiguë",
+  "review_required" => "Correspondance Google Books à confirmer",
+  "no_match" => "Aucune correspondance Google Books validée",
+  "configuration_error" => "Configuration Google Books incomplète",
+  "provider_unavailable" => "Google Books indisponible"
+}.fetch(status, "État d’enrichissement inconnu") %>
+<% status_label = "Correspondance Google Books à confirmer" if single_candidate_review %>
+<% status_label = "Aucune correspondance retenue" if status == "no_match" && enrichment["resolution"] == "manual_rejection" %>
+<% authors = Array(metadata["authors"]) %>
+<% identifiers = Array(metadata.fetch("identifiers", {}).values).flatten %>
+<% rating = if metadata.dig("rating", "average").present? && metadata.dig("rating", "count").present?
+  "#{metadata.dig("rating", "average")}/5 (#{metadata.dig("rating", "count")} vote#{"s" unless metadata.dig("rating", "count") == 1})"
+end %>
+
+<section class="metadata-panel" aria-labelledby="document-metadata-title">
+  <div class="panel-heading metadata-panel__heading">
+    <div>
+      <p class="eyebrow">Référentiel du document</p>
+      <h2 id="document-metadata-title">Métadonnées</h2>
+      <p class="metadata-provenance"><%= status_label %>.</p>
+    </div>
+    <%= button_to(
+      status == "accepted" ? "Actualiser les métadonnées" : (status == "not_enriched" ? "Enrichir les métadonnées" : "Rechercher à nouveau"),
+      enrich_metadata_document_path(document),
+      method: :post,
+      class: "button",
+      data: { turbo_frame: "_top" }
+    ) %>
+  </div>
+
+  <% if enrichment.dig("error", "message").present? %>
+    <p class="metadata-status" role="alert"><%= enrichment.dig("error", "message") %></p>
+  <% elsif single_candidate_review %>
+    <p class="metadata-status" role="status">Une correspondance est proposée, mais elle doit être confirmée manuellement ; aucune valeur n’a été promue automatiquement.</p>
+  <% elsif status == "ambiguous" %>
+    <p class="metadata-status" role="status">Plusieurs correspondances sont plausibles ; aucune valeur n’a été promue automatiquement.</p>
+  <% elsif status == "no_match" && enrichment["resolution"] == "manual_rejection" %>
+    <p class="metadata-status" role="status">Aucune des correspondances proposées n’a été retenue ; les métadonnées précédentes ont été conservées.</p>
+  <% elsif status == "no_match" %>
+    <p class="metadata-status" role="status">La recherche n’a pas fourni de correspondance suffisamment proche du nom du fichier.</p>
+  <% end %>
+  <% if enrichment["invalid_candidate_count"].to_i.positive? %>
+    <p class="metadata-status" role="status"><%= enrichment["invalid_candidate_count"] %> résultat(s) Google Books incomplet(s) ont été écarté(s) et restent signalés dans les métadonnées d’enrichissement.</p>
+  <% end %>
+
+  <% if reviewable && candidates.any? %>
+    <section class="metadata-candidates" aria-labelledby="metadata-candidates-title">
+      <div class="metadata-candidates__heading">
+        <div>
+          <p class="eyebrow">Résultats Google Books</p>
+          <h3 id="metadata-candidates-title">Correspondances proposées</h3>
+          <p class="metadata-provenance">Sélectionnez la bonne édition ; seules les données conservées par Google Books seront promues.</p>
+        </div>
+      </div>
+
+      <%= form_with url: confirm_metadata_document_path(document), method: :post, scope: :metadata_confirmation,
+        class: "metadata-candidates__form", data: { turbo_frame: "_top" } do |form| %>
+        <fieldset>
+          <legend class="visually-hidden">Correspondance Google Books à confirmer</legend>
+          <div class="metadata-candidates__list"
+            data-controller="metadata-candidates"
+            data-action="click->metadata-candidates#toggle change->metadata-candidates#refresh">
+            <% candidates.each_with_index do |candidate, index| %>
+              <% candidate_id = "metadata-candidate-#{index}" %>
+              <% candidate_authors = Array(candidate["authors"]) %>
+              <% candidate_identifiers = Array(candidate.fetch("identifiers", {}).values).flatten %>
+              <% candidate_rating = if candidate.dig("rating", "average").present? && candidate.dig("rating", "count").present?
+                "#{candidate.dig("rating", "average")}/5 (#{candidate.dig("rating", "count")} vote#{"s" unless candidate.dig("rating", "count") == 1})"
+              end %>
+              <div class="metadata-candidate" data-metadata-candidates-target="card">
+                <%= form.radio_button :volume_id, candidate["volume_id"], id: candidate_id, required: index.zero?, class: "metadata-candidate__input", data: { metadata_candidates_target: "input" } %>
+                <%= form.label :volume_id, for: candidate_id, class: "metadata-candidate__label" do %>
+                  <span class="metadata-candidate__title"><%= candidate["title"] %></span>
+                  <span class="metadata-candidate__details">
+                    <%= candidate_authors.presence&.to_sentence || "Auteur non renseigné" %>
+                    · <%= candidate["published_date"].presence || "Date non renseignée" %>
+                    · <%= candidate["publisher"].presence || "Éditeur non renseigné" %>
+                  </span>
+                  <% if candidate_identifiers.any? || candidate_rating %>
+                    <span class="metadata-candidate__details">
+                      <%= "ISBN : #{candidate_identifiers.to_sentence}" if candidate_identifiers.any? %>
+                      <%= " · Note Google Books : #{candidate_rating}" if candidate_rating %>
+                    </span>
+                  <% end %>
+                  <span class="metadata-candidate__proof">Volume Google Books : <code><%= candidate["volume_id"] %></code></span>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </fieldset>
+        <div class="form-actions metadata-candidates__actions">
+          <%= form.submit "Confirmer cette correspondance", class: "button" %>
+        </div>
+      <% end %>
+
+      <%= button_to "Aucune de ces correspondances", reject_metadata_document_path(document), method: :post,
+        class: "button button--secondary", data: { turbo_frame: "_top" } %>
+    </section>
+  <% end %>
+
+  <dl class="metadata-grid">
+    <div>
+      <dt>Titre</dt>
+      <dd><%= metadata["title"].presence || "Non renseigné" %></dd>
+    </div>
+    <div>
+      <dt>Auteur(s)</dt>
+      <dd><%= authors.presence&.to_sentence || "Non renseigné" %></dd>
+    </div>
+    <div>
+      <dt>Date d’édition</dt>
+      <dd><%= metadata["publication_date"].presence || "Non renseignée" %></dd>
+    </div>
+    <div>
+      <dt>Éditeur</dt>
+      <dd><%= metadata["publisher"].presence || "Non renseigné" %></dd>
+    </div>
+    <div>
+      <dt>Langue</dt>
+      <dd><%= metadata["language"].presence || "Non renseignée" %></dd>
+    </div>
+    <div>
+      <dt>Identifiants</dt>
+      <dd><%= identifiers.presence&.to_sentence || "Non renseignés" %></dd>
+    </div>
+    <div>
+      <dt>Note Google Books</dt>
+      <dd><%= rating || "Non disponible" %></dd>
+    </div>
+    <div>
+      <dt>Correspondance Google Books</dt>
+      <dd><%= enrichment["volume_id"].presence || "Non validée" %></dd>
+    </div>
+    <div>
+      <dt>Dernière observation</dt>
+      <dd><%= enrichment["observed_at"].presence || "Non observée" %></dd>
+    </div>
+    <div>
+      <dt>Statut d’enrichissement</dt>
+      <dd><%= status %></dd>
+    </div>
+    <div class="metadata-grid__wide">
+      <dt>SHA-256 du PDF</dt>
+      <dd><code><%= document.source_sha256 %></code></dd>
+    </div>
+    <div class="metadata-grid__wide">
+      <dt>Fichier source</dt>
+      <dd><%= document.source_pdf.filename %></dd>
+    </div>
+    <div>
+      <dt>Format</dt>
+      <dd><%= document.source_pdf.blob.content_type %></dd>
+    </div>
+    <div>
+      <dt>Taille</dt>
+      <dd><%= number_to_human_size(document.source_pdf.blob.byte_size) %></dd>
+    </div>
+    <div>
+      <dt>Pages converties</dt>
+      <dd><%= attempt.page_count || "Non disponible" %></dd>
+    </div>
+    <div>
+      <dt>Importé le</dt>
+      <dd><%= l document.created_at, format: :long %></dd>
+    </div>
+  </dl>
+</section>

@@ -10,12 +10,16 @@ class ConvertDocumentJob < ApplicationJob
   self.enqueue_after_transaction_commit = true
 
   def perform(attempt)
-    result = attempt.document.source_pdf.open do |file|
-      server = begin_conversion!(attempt)
+    ensure_document_kept!(attempt)
+    server = begin_conversion!(attempt)
+    document = document_for_attempt(attempt)
+    raise InvalidState, "La tentative appartient à un document supprimé." unless document&.kept?
+
+    result = document.source_pdf.open do |file|
       begin
         docling_client(server.url).convert(
           file: file,
-          filename: attempt.document.source_pdf.filename.to_s,
+          filename: document.source_pdf.filename.to_s,
           options: attempt.conversion_options
         ).tap { mark_docling_returned!(attempt) }
       rescue DoclingClient::ConversionError => error
@@ -41,19 +45,23 @@ class ConvertDocumentJob < ApplicationJob
 
   def begin_conversion!(attempt)
     interrupted = false
-    attempt.with_lock do
-      if attempt.converting? && attempt.execution_job_id == job_id
-        attempt.update!(
-          status: "failed",
-          error_code: "interrupted_execution",
-          error_message: "Le processus de conversion s'est arrêté avant de produire un résultat.",
-          completed_at: Time.current
-        )
-        interrupted = true
-      elsif !conversion_ready_for_job?(attempt)
-        raise InvalidState, "La tentative #{attempt.id} n'est plus en attente."
+    persisted = with_kept_document(attempt) do
+      attempt.with_lock do
+        if attempt.converting? && attempt.execution_job_id == job_id
+          attempt.update!(
+            status: "failed",
+            error_code: "interrupted_execution",
+            error_message: "Le processus de conversion s'est arrêté avant de produire un résultat.",
+            completed_at: Time.current
+          )
+          interrupted = true
+        elsif !conversion_ready_for_job?(attempt)
+          raise InvalidState, "La tentative #{attempt.id} n'est plus en attente."
+        end
+        true
       end
     end
+    raise InvalidState, "La tentative appartient à un document supprimé." unless persisted
     if interrupted
       raise InterruptedExecution, "La tentative #{attempt.id} interrompue a été rendue terminale."
     end
@@ -70,10 +78,13 @@ class ConvertDocumentJob < ApplicationJob
   end
 
   def mark_docling_returned!(attempt)
-    attempt.with_lock do
-      ensure_active!(attempt)
-      attempt.update!(docling_server_returned_at: Time.current)
+    persisted = with_kept_document(attempt) do
+      attempt.with_lock do
+        ensure_active!(attempt)
+        attempt.update!(docling_server_returned_at: Time.current)
+      end
     end
+    raise InvalidState, "La tentative appartient à un document supprimé." unless persisted
   end
 
   def conversion_ready_for_job?(attempt)
@@ -81,27 +92,64 @@ class ConvertDocumentJob < ApplicationJob
       (attempt.execution_job_id.blank? || attempt.execution_job_id == job_id)
   end
 
+  def ensure_document_kept!(attempt)
+    return if document_for_attempt(attempt)&.kept?
+
+    raise InvalidState, "La tentative appartient à un document supprimé."
+  end
+
+  def document_for_attempt(attempt)
+    return unless attempt
+
+    Document.with_discarded.find_by(id: attempt.document_id)
+  end
+
+  def with_kept_document(attempt)
+    document = document_for_attempt(attempt)
+    return false unless document&.kept?
+
+    document.with_lock do
+      return false unless document.kept?
+
+      yield document
+    end
+  end
+
   def persist_result!(attempt, result)
     payload = result.payload
     content = payload.fetch("document")
     document_bytes = JSON.generate(content.fetch("json_content"))
+
+    ready = with_kept_document(attempt) { attempt.with_lock { ensure_active!(attempt) } }
+    raise InvalidState, "La tentative appartient à un document supprimé." unless ready
+    attached_outputs = persist_outputs!(attempt, result)
     qualification = nil
 
-    attempt.with_lock { ensure_active!(attempt) }
-    persist_outputs!(attempt, result)
-    attempt.with_lock do
-      ensure_active!(attempt)
-      attempt.update!(
-        status: "succeeded",
-        page_count: content.fetch("json_content").fetch("pages").size,
-        processing_seconds: payload["processing_time"],
-        completed_at: Time.current
-      )
-      qualification = create_qualification!(
-        attempt,
-        Digest::SHA256.hexdigest(document_bytes)
-      )
+    begin
+      persisted = with_kept_document(attempt) do
+        attempt.with_lock do
+          ensure_active!(attempt)
+          attempt.update!(
+            status: "succeeded",
+            page_count: content.fetch("json_content").fetch("pages").size,
+            processing_seconds: payload["processing_time"],
+            completed_at: Time.current
+          )
+          qualification = create_qualification!(
+            attempt,
+            Digest::SHA256.hexdigest(document_bytes)
+          )
+        end
+      end
+    rescue InvalidState
+      purge_attachments!(attached_outputs)
+      raise
     end
+    unless persisted
+      purge_attachments!(attached_outputs)
+      raise InvalidState, "La tentative appartient à un document supprimé."
+    end
+
     enqueue_math_qualification_or_mark_failed!(qualification)
   end
 
@@ -115,6 +163,8 @@ class ConvertDocumentJob < ApplicationJob
   end
 
   def enqueue_math_qualification_or_mark_failed!(qualification)
+    return unless with_kept_document(qualification.conversion_attempt) { true }
+
     job = enqueue_math_qualification(qualification)
     mark_math_qualification_enqueued!(qualification, job)
   rescue ActiveJob::EnqueueError, SolidQueue::Job::EnqueueError, EnqueueFailed => error
@@ -128,25 +178,29 @@ class ConvertDocumentJob < ApplicationJob
   end
 
   def mark_math_qualification_enqueued!(qualification, job)
-    qualification.with_lock do
-      if qualification.staging?
-        qualification.update!(status: "queued", execution_job_id: job.job_id)
-      elsif qualification.queued? && qualification.execution_job_id.blank?
-        qualification.update!(execution_job_id: job.job_id)
+    with_kept_document(qualification.conversion_attempt) do
+      qualification.with_lock do
+        if qualification.staging?
+          qualification.update!(status: "queued", execution_job_id: job.job_id)
+        elsif qualification.queued? && qualification.execution_job_id.blank?
+          qualification.update!(execution_job_id: job.job_id)
+        end
       end
     end
   end
 
   def mark_math_qualification_enqueue_failure!(qualification, message)
-    qualification.with_lock do
-      return unless qualification.staging? || qualification.queued?
+    with_kept_document(qualification.conversion_attempt) do
+      qualification.with_lock do
+        return unless qualification.staging? || qualification.queued?
 
-      qualification.update!(
-        status: "failed",
-        error_code: "enqueue_failed",
-        error_message: message.truncate(500),
-        completed_at: Time.current
-      )
+        qualification.update!(
+          status: "failed",
+          error_code: "enqueue_failed",
+          error_message: message.truncate(500),
+          completed_at: Time.current
+        )
+      end
     end
   end
 
@@ -155,43 +209,74 @@ class ConvertDocumentJob < ApplicationJob
   end
 
   def persist_outputs!(attempt, result)
-    attach(attempt.docling_response, result.raw_body, "response.json", "application/json") if result.raw_body
+    attached_outputs = []
+    attach_output!(attempt, attached_outputs, attempt.docling_response, result.raw_body,
+      "response.json", "application/json") if result.raw_body
     payload = result.payload
     content = payload["document"] if payload.is_a?(Hash)
-    return unless content.is_a?(Hash)
+    return attached_outputs unless content.is_a?(Hash)
 
     json = content["json_content"]
-    attach(attempt.docling_document, JSON.generate(json), "document.json", "application/json") if json.is_a?(Hash)
-    attach(attempt.doctags, content["doctags_content"], "document.doctags", "text/plain") if content["doctags_content"].is_a?(String)
-    attach(attempt.html, content["html_content"], "document.html", "text/html") if content["html_content"].is_a?(String)
-    attach(attempt.markdown, content["md_content"], "document.md", "text/markdown") if content["md_content"].is_a?(String)
+    attach_output!(attempt, attached_outputs, attempt.docling_document, JSON.generate(json),
+      "document.json", "application/json") if json.is_a?(Hash)
+    attach_output!(attempt, attached_outputs, attempt.doctags, content["doctags_content"],
+      "document.doctags", "text/plain") if content["doctags_content"].is_a?(String)
+    attach_output!(attempt, attached_outputs, attempt.html, content["html_content"],
+      "document.html", "text/html") if content["html_content"].is_a?(String)
+    attach_output!(attempt, attached_outputs, attempt.markdown, content["md_content"],
+      "document.md", "text/markdown") if content["md_content"].is_a?(String)
+    attached_outputs
+  rescue InvalidState
+    purge_attachments!(attached_outputs)
+    raise
   end
 
   def persist_failure!(attempt, error)
+    ready = with_kept_document(attempt) { attempt.with_lock { active?(attempt) } }
+    return unless ready
+    attached_outputs = []
     output_error_message = nil
-    attempt.with_lock { return unless active?(attempt) }
     if error.result
       begin
-        persist_outputs!(attempt, error.result)
+        attached_outputs = persist_outputs!(attempt, error.result)
+      rescue InvalidState
+        raise
       rescue StandardError => output_error
         output_error_message = "Les sorties partielles n'ont pas pu être stockées : #{output_error.message}"
       end
     end
 
-    attempt.with_lock do
-      return unless active?(attempt)
-
-      attempt.update!(
-        status: "failed",
-        error_code: error.code,
-        error_message: [ error.message, output_error_message ].compact.join(" ").truncate(500),
-        completed_at: Time.current
-      )
+    persisted = with_kept_document(attempt) do
+      attempt.with_lock do
+        if active?(attempt)
+          attempt.update!(
+            status: "failed",
+            error_code: error.code,
+            error_message: [ error.message, output_error_message ].compact.join(" ").truncate(500),
+            completed_at: Time.current
+          )
+          true
+        else
+          false
+        end
+      end
     end
+    purge_attachments!(attached_outputs) unless persisted
+  end
+
+  def attach_output!(attempt, attached_outputs, attachment, content, filename, content_type)
+    ensure_document_kept!(attempt)
+    attach(attachment, content, filename, content_type)
+    attached_outputs << attachment
+    ensure_document_kept!(attempt)
+  end
+
+  def purge_attachments!(attachments)
+    attachments.each { |attachment| attachment.purge if attachment.attached? }
   end
 
   def ensure_active!(attempt)
-    return if active?(attempt)
+    return true if active?(attempt)
 
     raise InvalidState, "La tentative #{attempt.id} n'appartient plus à cette exécution."
   end

@@ -4,7 +4,7 @@
     <span hidden
       data-controller="page-html-availability"
       data-page-html-availability-url-value="<%= corrected_preview ? derived_html_preview_document_path(qualification.conversion_attempt.document) : page_html_preview_document_path(qualification.conversion_attempt.document) %>"
-      data-page-html-availability-label-value="<%= corrected_preview ? "HTML corrigé" : "HTML natif paginé" %>"
+      data-page-html-availability-label-value="<%= corrected_preview ? "HTML corrigé" : "HTML original" %>"
       data-page-html-availability-corrected-value="<%= corrected_preview %>"></span>
   <% end %>
   <h2 id="math-qualification-title">Qualification mathématique</h2>
@@ -51,7 +51,7 @@
       <div><dt>Total</dt><dd><%= coverage.fetch("pages_total") %></dd></div>
     </dl>
     <% if html_integrity = qualification.summary["html_integrity"] %>
-      <% audited_html = html_integrity.fetch("artifact") == "derived_html" ? "HTML corrigé" : "HTML natif paginé" %>
+      <% audited_html = html_integrity.fetch("artifact") == "derived_html" ? "HTML corrigé" : "HTML original" %>
       <h3>Intégrité — <%= audited_html %></h3>
       <p>
         <strong><%= html_integrity.fetch("status") == "passed" ? "Intégrité vérifiée" : "Anomalies détectées" %></strong>

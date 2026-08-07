@@ -2,6 +2,51 @@ require "test_helper"
 require "securerandom"
 
 class QualifyMathJobTest < ActiveJob::TestCase
+  test "refuse de qualifier un document supprimé" do
+    qualification = create_qualification
+    qualification.conversion_attempt.document.discard!
+
+    assert_raises(QualifyMathJob::InvalidState) do
+      job_with(FakeClient.new).perform(qualification)
+    end
+
+    assert_predicate MathQualification.unscoped.find(qualification.id), :staging?
+  end
+
+  test "n'enregistre aucune preuve si le document est supprimé pendant la qualification" do
+    qualification = create_qualification
+    client = DiscardingClient.new(qualification, successful_result)
+
+    assert_raises(QualifyMathJob::InvalidState) do
+      job_with(client).perform(qualification)
+    end
+
+    stored_qualification = MathQualification.unscoped.find(qualification.id)
+    assert_predicate stored_qualification, :running?
+    assert_not stored_qualification.analyzer_response.attached?
+    assert_not stored_qualification.report.attached?
+  end
+
+  test "purge les preuves si le document est supprimé pendant leur stockage" do
+    qualification = create_qualification
+    job = job_with(FakeClient.new(successful_result))
+    original_attach = job.method(:attach)
+    first_attachment = true
+    job.define_singleton_method(:attach) do |attachment, content, filename, content_type|
+      original_attach.call(attachment, content, filename, content_type)
+      if first_attachment
+        first_attachment = false
+        Document.with_discarded.find(qualification.conversion_attempt.document_id).discard!
+      end
+    end
+
+    assert_raises(QualifyMathJob::InvalidState) { job.perform(qualification) }
+
+    stored_qualification = MathQualification.unscoped.find(qualification.id)
+    assert_not stored_qualification.analyzer_response.attached?
+    assert_not stored_qualification.report.attached?
+  end
+
   test "persiste la progression, les preuves et un verdict contradictoire" do
     qualification = create_qualification
     client = FakeClient.new(successful_result)
@@ -1340,6 +1385,18 @@ class QualifyMathJobTest < ActiveJob::TestCase
 
       yield({ "phase" => "candidate_evaluation", "completed_units" => 1, "total_units" => 1 })
       @result
+    end
+  end
+
+  class DiscardingClient < FakeClient
+    def initialize(qualification, result)
+      super(result)
+      @qualification = qualification
+    end
+
+    def qualify(**_arguments)
+      Document.with_discarded.find(@qualification.conversion_attempt.document_id).discard!
+      super
     end
   end
 end

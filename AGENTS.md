@@ -25,11 +25,8 @@
   sans rapport avec la demande.
 - Préfère un module de production et son module de tests à une couche générique.
 - Inspecte d'abord la bibliothèque standard et les dépendances présentes. Si
-  elles ne répondent pas au besoin sans code ou risque disproportionné, recherche
+  elles ne répondent pas au besoin sans code, recherche
   les bibliothèques externes maintenues et largement adoptées pour le problème.
-- Une nouvelle dépendance est acceptable si elle évite réellement du code ou du
-  risque et si son poids, sa complexité et sa maintenance restent proportionnés
-  au besoin. N'utilise pas une dépendance lourde pour un problème simple et local.
 - N'introduis pas d'abstraction pour un seul usage. Extrais seulement la plus
   petite duplication réelle.
 - N'introduis pas de code défensif non sollicité par le développeur sans son accord 

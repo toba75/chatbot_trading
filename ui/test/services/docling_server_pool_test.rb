@@ -108,6 +108,17 @@ class DoclingServerPoolTest < ActiveSupport::TestCase
     assert_equal REMOTE, server
   end
 
+  test "refuse d'affecter un serveur à une tentative d'un document supprimé" do
+    attempt = waiting_attempt("job-document-supprimé")
+    attempt.document.discard!
+
+    assert_raises(DoclingServerPool::InvalidAttempt) do
+      pool.acquire(attempt, job_id: "job-document-supprimé")
+    end
+
+    assert_predicate ConversionAttempt.unscoped.find(attempt.id), :queued?
+  end
+
   test "refuse une configuration dont les priorités ne sont pas uniques" do
     configuration = JSON.generate([
       { name: "remote", url: REMOTE.url, priority: 1 },

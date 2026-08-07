@@ -8,13 +8,7 @@
   <%= turbo_frame_tag @document, data: { cable_reconcile_target: "frame" } do %>
     <%= link_to "Documents", documents_path, class: "back-link", data: { turbo_frame: "_top" } %>
 
-    <header class="page-heading document-header">
-      <div>
-        <p class="eyebrow">Conversion Docling</p>
-        <h1><%= @document.source_pdf.filename %></h1>
-        <p class="lead">Document <%= @document.id %></p>
-      </div>
-    </header>
+    <%= render "document_header", document: @document %>
 
     <p class="elapsed-time">
       Durée écoulée depuis l’envoi :
@@ -25,186 +19,113 @@
       } %>
     </p>
 
-    <% if @attempt.staging? || @attempt.queued? || @attempt.converting? %>
-      <% status = @document.processing_status %>
-      <section class="status-card" aria-live="polite">
-        <span class="status-dot"></span>
-        <div>
-          <strong><%= status.fetch(:label) %></strong>
-          <p>La page se mettra à jour dès que l’état persistant changera.</p>
-        </div>
-      </section>
-    <% elsif @attempt.failed? %>
-      <section class="status-card error" role="alert">
-        <div>
-          <strong>La conversion a échoué</strong>
-          <p><%= @attempt.error_message %></p>
-          <code><%= @attempt.error_code %></code>
-        </div>
-      </section>
-      <%= render "attempt_outputs", attempt: @attempt, title: "Sorties conservées" %>
-      <%= button_to "Relancer le traitement", retry_document_path(@document), method: :post,
-        class: "button", data: { turbo_frame: "_top" } %>
-    <% else %>
-      <% blank_pages = @attempt.page_inventory.select { |page| page[:blank] }.pluck(:number) %>
-      <% if blank_pages.any? %>
-        <% page_links = blank_pages.map do |page| %>
-          <% link_to page, "#document-visualization-panel",
-            aria: { label: "Afficher la page #{page} dans le PDF" },
-            data: {
-              action: "blank-page-navigation#show",
-              blank_page_navigation_page_param: page
-            } %>
-        <% end %>
-        <p class="conversion-warning" role="alert" data-controller="blank-page-navigation">
-          <strong><%= blank_pages.one? ? "1 page semble vide" : "#{blank_pages.size} pages semblent vides" %></strong>
-          — <%= blank_pages.one? ? "page" : "pages" %> <%= safe_join(page_links, ", ") %>
-        </p>
-      <% end %>
+    <section class="document-panels" data-controller="panel-tabs">
+      <nav class="panel-tabs" role="tablist" aria-label="Sections du document">
+        <button
+          id="document-metadata-tab"
+          type="button"
+          class="panel-tab"
+          role="tab"
+          aria-controls="document-metadata-panel"
+          aria-selected="false"
+          tabindex="-1"
+          data-panel-tabs-target="tab"
+          data-action="click->panel-tabs#select keydown->panel-tabs#navigate"
+        >Métadonnées</button>
+        <button
+          id="document-visualization-tab"
+          type="button"
+          class="panel-tab active"
+          role="tab"
+          aria-controls="document-visualization-panel"
+          aria-selected="true"
+          tabindex="0"
+          data-panel-tabs-target="tab"
+          data-action="click->panel-tabs#select keydown->panel-tabs#navigate"
+        >Visualisation</button>
+      </nav>
 
-      <% if @math_qualification %>
-        <%= render "math_qualification", qualification: @math_qualification %>
-      <% end %>
-
-      <% if @previous_math_qualifications.any? %>
-        <details class="math-qualification-history">
-          <summary>Historique des qualifications mathématiques</summary>
-          <% @previous_math_qualifications.each do |qualification| %>
-            <article>
-              <h3>Qualification #<%= qualification.id %> du <%= l qualification.created_at, format: :long %> — <%= qualification.failed? ? "échec" : "réussie" %></h3>
-              <% if qualification.failed? %>
-                <p>
-                  La qualification a échoué.
-                  <%= tag.code qualification.error_code if qualification.error_code.present? %>
-                </p>
-              <% end %>
-              <%= render "math_qualification_artifacts", qualification: qualification %>
-            </article>
-          <% end %>
-        </details>
-      <% end %>
-
-      <% native_page_html_available = !!(@math_qualification&.succeeded? && @math_qualification.native_page_html.attached?) %>
-      <% corrected_html_available = !!(
-        @math_qualification&.succeeded? && @math_qualification.current_contract? &&
-        @math_qualification.derived_html.attached?
-      ) %>
-      <% html_formats = [
-        [ "HTML corrigé", "html-corrected", derived_html_preview_document_path(@document), "HTML corrigé", true, :html, corrected_html_available ],
-        [ "HTML natif paginé", "html-native-page", page_html_preview_document_path(@document), "HTML natif paginé", true, :html, native_page_html_available ],
-        [ "HTML natif exact", "html-native-exact", html_preview_document_path(@document), "HTML natif exact", false, :html, true ]
-      ] %>
-      <% formats = html_formats + [
-        [ "Markdown", "markdown", markdown_preview_document_path(@document), "Conversion Markdown", false, :markdown, true ],
-        [ "JSON", "json", docling_page_preview_document_path(@document, page: 1), "Projection JSON de la page 1", false, :json, true ]
-      ] %>
-      <% initial_format = if corrected_html_available
-        formats.first
-      elsif native_page_html_available
-        formats.second
-      else
-        formats.third
-      end %>
-      <% initial_html_path = initial_format[4] ? "#{initial_format[2]}#page-1" : initial_format[2] %>
-      <% initial_html_title = initial_format[4] ? "#{initial_format[3]} — page 1" : initial_format[3] %>
-      <section
-        id="document-visualization-panel"
-        class="comparison"
-        aria-label="Comparaison du document"
-        data-controller="page-sync"
-        data-action="page-html:available@window->page-sync#useHtmlUrl"
-        data-page-sync-pdf-url-value="<%= rails_blob_path(@document.source_pdf, disposition: "inline") %>"
-        data-page-sync-html-url-value="<%= initial_format[2] %>"
-        data-page-sync-html-synchronized-value="<%= initial_format[4] %>"
-        data-page-sync-json-url-value="<%= docling_page_preview_document_path(@document) %>"
-        data-page-sync-page-count-value="<%= @attempt.page_count %>"
-        data-page-sync-worker-url-value="<%= asset_path("pdfjs/pdf.worker.min.js") %>"
+      <div
+        id="document-metadata-panel"
+        role="tabpanel"
+        aria-labelledby="document-metadata-tab"
+        hidden
+        data-panel-tabs-target="panel"
       >
-        <article>
-          <h2>PDF original</h2>
-          <nav class="page-navigation" aria-label="Navigation dans le PDF original">
-            <button type="button" data-page-sync-target="previous" data-action="page-sync#previous" disabled>Précédente</button>
-            <label>
-              Page
-              <input
-                type="number"
-                min="1"
-                value="1"
-                inputmode="numeric"
-                data-page-sync-target="page"
-                data-action="change->page-sync#choosePage keydown.enter->page-sync#choosePage"
-              >
-              / <span data-page-sync-target="total"><%= @attempt.page_count %></span>
-            </label>
-            <button type="button" data-page-sync-target="next" data-action="page-sync#next">Suivante</button>
-          </nav>
-          <div class="pdf-page-viewer" data-page-sync-target="viewer">
-            <p data-page-sync-target="status">Chargement du PDF…</p>
-            <canvas title="Page courante du PDF original" data-page-sync-target="canvas"></canvas>
-          </div>
-        </article>
-        <article data-controller="format-tabs">
-          <h2>Conversion Docling</h2>
-          <% preview_id = "docling-preview-#{@document.id}" %>
-          <% preview_name = "docling_preview_#{@document.id}" %>
-          <nav class="format-tabs" role="tablist" aria-label="Formats Docling">
-            <% formats.each do |label, key, path, title, synchronized, kind, available| %>
-              <% tab_id = "#{preview_id}-#{key}" %>
-              <% selected = key == initial_format[1] %>
-              <%= link_to label, path,
-                id: tab_id,
-                class: class_names("format-tab", active: selected),
-                role: "tab",
-                target: preview_name,
-                hidden: !available,
-                tabindex: selected ? 0 : -1,
-                aria: { controls: preview_id, selected: selected },
+        <%= render "document_metadata", document: @document, attempt: @attempt %>
+      </div>
+
+      <div
+        id="document-visualization-panel"
+        role="tabpanel"
+        aria-labelledby="document-visualization-tab"
+        data-panel-tabs-target="panel"
+      >
+        <% if @attempt.staging? || @attempt.queued? || @attempt.converting? %>
+          <% status = @document.processing_status %>
+          <section class="status-card" aria-live="polite">
+            <span class="status-dot"></span>
+            <div>
+              <strong><%= status.fetch(:label) %></strong>
+              <p>La page se mettra à jour dès que l’état persistant changera.</p>
+            </div>
+          </section>
+        <% elsif @attempt.failed? %>
+          <section class="status-card error" role="alert">
+            <div>
+              <strong>La conversion a échoué</strong>
+              <p><%= @attempt.error_message %></p>
+              <code><%= @attempt.error_code %></code>
+            </div>
+          </section>
+          <%= render "attempt_outputs", attempt: @attempt, title: "Sorties conservées" %>
+          <%= button_to "Relancer le traitement", retry_document_path(@document), method: :post,
+            class: "button", data: { turbo_frame: "_top" } %>
+        <% else %>
+          <% blank_pages = @attempt.page_inventory.select { |page| page[:blank] }.pluck(:number) %>
+          <% if blank_pages.any? %>
+            <% page_links = blank_pages.map do |page| %>
+              <% link_to page, "#document-visualization-panel",
+                aria: { label: "Afficher la page #{page} dans le PDF" },
                 data: {
-                  format_tabs_target: "tab",
-                  page_sync_target: if key == "html-corrected"
-                    "htmlTab correctedHtmlTab"
-                  elsif key == "html-native-page"
-                    "htmlTab nativeHtmlTab"
-                  elsif kind == :html
-                    "htmlTab"
-                  elsif kind == :json
-                    "jsonTab"
-                  end,
-                  page_sync_base_url: kind == :html ? path : nil,
-                  page_sync_synchronized: kind == :html ? synchronized : nil,
-                  page_sync_title: kind == :html ? title : nil,
-                  action: class_names(
-                    "click->format-tabs#select keydown->format-tabs#navigate",
-                    "click->page-sync#selectHtml" => kind == :html,
-                    "click->page-sync#selectJson" => kind == :json
-                  ),
-                  preview_title: title
+                  action: "blank-page-navigation#show",
+                  blank_page_navigation_page_param: page
                 } %>
             <% end %>
-          </nav>
-          <p class="html-sync-notice" data-page-sync-target="htmlSyncNotice" <%= "hidden" if native_page_html_available %>>
-            La synchronisation HTML par page sera disponible après une qualification mathématique réussie.
-          </p>
-          <iframe
-            id="<%= preview_id %>"
-            name="<%= preview_name %>"
-            title="<%= initial_html_title %>"
-            role="tabpanel"
-            aria-labelledby="<%= preview_id %>-<%= initial_format[1] %>"
-            sandbox=""
-            data-format-tabs-target="preview"
-            data-page-sync-target="doclingPreview"
-            src="<%= initial_html_path %>"></iframe>
-          <p class="canonical-download">
-            <%= link_to "Télécharger le JSON canonique complet",
-              rails_blob_path(@attempt.docling_document, disposition: "attachment") %>
-          </p>
-        </article>
-      </section>
+            <p class="conversion-warning" role="alert" data-controller="blank-page-navigation">
+              <strong><%= blank_pages.one? ? "1 page semble vide" : "#{blank_pages.size} pages semblent vides" %></strong>
+              — <%= blank_pages.one? ? "page" : "pages" %> <%= safe_join(page_links, ", ") %>
+            </p>
+          <% end %>
 
-      <p class="notice">L’HTML et le Markdown suivent l’ordre de lecture ; le PDF reste la référence pour la géométrie et la mise en page.</p>
+          <% if @math_qualification %>
+            <%= render "math_qualification", qualification: @math_qualification %>
+          <% end %>
 
-    <% end %>
+          <% if @previous_math_qualifications.any? %>
+            <details class="math-qualification-history">
+              <summary>Historique des qualifications mathématiques</summary>
+              <% @previous_math_qualifications.each do |qualification| %>
+                <article>
+                  <h3>Qualification #<%= qualification.id %> du <%= l qualification.created_at, format: :long %> — <%= qualification.failed? ? "échec" : "réussie" %></h3>
+                  <% if qualification.failed? %>
+                    <p>
+                      La qualification a échoué.
+                      <%= tag.code qualification.error_code if qualification.error_code.present? %>
+                    </p>
+                  <% end %>
+                  <%= render "math_qualification_artifacts", qualification: qualification %>
+                </article>
+              <% end %>
+            </details>
+          <% end %>
+
+          <%= render "document_visualization" %>
+
+          <p class="notice">L’HTML et le Markdown suivent l’ordre de lecture ; le PDF reste la référence pour la géométrie et la mise en page.</p>
+        <% end %>
+      </div>
+    </section>
 
     <% if @previous_attempts.any? %>
       <details class="attempt-history">

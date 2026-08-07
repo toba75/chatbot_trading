@@ -396,9 +396,9 @@ appartenance aux régions du rapport et leur concordance avec les compteurs,
 sans redéduire la politique de ciblage. Il recoupe aussi les statuts et refuse
 un document dérivé qui n'est pas un objet `DoclingDocument`.
 L'interface identifie explicitement ces sorties comme dérivées. L’onglet
-« HTML corrigé » est synchronisé avec la page PDF. Deux onglets distincts
-conservent la resérialisation native paginée et l’HTML natif exact reçu de
-Docling Serve. Toutes les routes conservent leur politique `sandbox` et les
+« HTML corrigé » est synchronisé avec la page PDF. L’onglet « HTML original »
+représente la sortie paginée quand elle est disponible et sinon le HTML exact
+reçu de Docling Serve. Toutes les routes conservent leur politique `sandbox` et les
 artefacts bruts restent téléchargeables séparément.
 
 Le contrat v2.1 et les paramètres `MATH_CORRECTION_ENDPOINT`,
@@ -449,9 +449,24 @@ n’interroge aucun service. PDF.js affiche une seule page du PDF original ; ses
 commandes précédente, suivante et numéro de page constituent l’état de navigation
 partagé avec l’onglet JSON.
 
+La page d’un document affiche une miniature de la première page et les champs
+bibliographiques portés par `Document.metadata`. Le bouton `Enrichir les
+métadonnées` appelle explicitement Google Books avec la clé conservée dans les
+credentials Rails, puis persiste la réponse normalisée sur le document. Une
+correspondance ambiguë, une absence de résultat ou une indisponibilité du
+fournisseur conserve son statut observable sans remplacer une valeur déjà
+confirmée ; le catalogue Python n’est pas lu par l’interface. Le statut
+`ambiguous` désigne plusieurs candidats plausibles ; `review_required` désigne
+un candidat unique qui doit tout de même être confirmé manuellement. Dans les
+deux cas, l’onglet Métadonnées affiche les titres,
+auteurs, dates, éditeurs, identifiants et notes ; seule la sélection d’un
+`volume_id` déjà présent dans les candidats persistés peut promouvoir la
+bibliographie. Le rejet explicite conserve la bibliographie précédente et
+marque la résolution manuelle.
+
 Le visualiseur à onglets charge à la demande un seul format Docling : l’HTML
-corrigé paginé lorsqu’il existe, l’HTML natif paginé ou exact, le Markdown brut
-ou une projection JSON de la page PDF courante. Cette
+corrigé lorsqu’il existe, l’HTML original, le Markdown brut ou une projection
+JSON de la page PDF courante. Cette
 projection contient l’objet `page` et les `texts`, `pictures`, `tables`,
 `key_value_items` et `form_items` dont `prov.page_no` correspond. Son bloc
 `_projection` signale explicitement la sélection et les structures globales
@@ -464,6 +479,33 @@ de la page demandée. Le fichier canonique reste inchangé et téléchargeable d
 son intégralité. Chaque format est isolé dans la même iframe `sandbox` ; ils ne
 sont jamais injectés ensemble.
 
+La recherche Google Books exploite désormais toutes les preuves disponibles :
+chaque ISBN/ISSN est interrogé séparément, puis les recherches par titre sont
+déclinées avec chacun des auteurs (et, lorsque présent, l’éditeur). Les résultats
+sont fusionnés par identifiant de volume et conservent les requêtes qui les ont
+produits. Le classement expose les signaux de titre, d’auteur, d’éditeur et
+d’année. `printType=all` conserve la couverture des livres et des périodiques ;
+un ISSN n’est considéré comme preuve que s’il est réellement retourné dans les
+identifiants du volume. Une seule correspondance n’est promue automatiquement
+que lorsqu’elle reste suffisamment fiable, sinon l’utilisateur confirme une carte.
+
+La suppression depuis la bibliothèque est un soft delete porté par la gem
+`discard` : elle renseigne `documents.deleted_at`, retire le document de la
+liste active et le conserve avec son PDF, ses tentatives et ses métadonnées
+dans la `Corbeille`. `Document` applique par défaut le scope `kept` ; les
+tentatives et qualifications filtrent aussi leur document parent conservé.
+Les jobs de conversion, de qualification et d’affectation Docling revalident
+fraîchement le parent avant leurs transitions et leurs écritures dérivées ; si
+le parent est supprimé pendant l’appel externe, aucune sortie ni qualification
+n’est persistée. L’action `Restaurer` utilise
+`with_discarded` puis `undiscard!` et remet `deleted_at` à `NULL`. Aucune
+suppression physique n’est effectuée par l’interface ; les documents supprimés
+restent exclus des routes de consultation et des aperçus.
+Le générateur Python de chunks travaille actuellement sur les artefacts du
+corpus de référence sur système de fichiers, indépendamment du modèle Rails
+`Document` ; il ne peut donc pas observer `deleted_at`. Toute future exportation
+de chunks ou d’index depuis Rails devra partir d’une relation `kept` filtrée.
+
 ## Services
 
 - `postgres` : données Rails, Solid Queue et base distincte Solid Cable ;
@@ -472,9 +514,23 @@ sont jamais injectés ensemble.
 - `docling-serve` : image officielle CUDA épinglée par digest ;
 - `math-audit` : service Python borné, sans GPU, client du Gemma distant pour
   les seules régions contradictoires prouvées ;
-- `test` : Minitest et Chromium, exclusivement dans Docker.
+- `test` : Minitest et Chromium sur le serveur Capybara isolé ;
+- `system-test-web` et `system-test-jobs` : pile externe réelle en
+  `RAILS_ENV=test`, reliée aux bases fixes `ui_system_test` et
+  `ui_system_test_cable`, au volume `rails_system_test_storage` et au seul
+  service Docling local de la pile ;
+- `system-test` : pilote Chromium de la pile externe. Il vérifie l'identité
+  HTTP calculée depuis l'environnement Rails, les deux bases et la racine
+  Active Storage avant tout import ; il refuse ainsi une cible ou des
+  ressources de développement, de recette ou de production.
 
 Le PDF de référence est
 `reference/ostrading-environment-qualification-5-pages.pdf`. Le corpus
 mathématique représentatif est l’extrait réel de deux pages déclaré dans
 `qualification/math_audit/manifest.json`.
+
+Dans l’onglet Métadonnées, les correspondances Google Books sont présentées
+comme des cartes sélectionnables : un clic active ou désactive une carte, et
+une seule carte peut être active par grille. Le contrôle radio natif reste
+présent dans le formulaire mais est masqué visuellement pour conserver la
+soumission et l’accessibilité.

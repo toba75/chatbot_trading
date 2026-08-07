@@ -122,6 +122,10 @@ class DoclingServerPool
   end
 
   def ensure_waiting_for!(attempt, job_id)
+    unless Document.with_discarded.find_by(id: attempt.document_id)&.kept?
+      raise InvalidAttempt, "La tentative appartient à un document supprimé."
+    end
+
     return if (attempt.staging? || attempt.queued?) &&
       (attempt.execution_job_id.blank? || attempt.execution_job_id == job_id)
 

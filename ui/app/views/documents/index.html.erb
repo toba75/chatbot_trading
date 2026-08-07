@@ -1,21 +1,26 @@
 <main
   class="documents-index"
   data-controller="cable-reconcile"
-  data-cable-reconcile-url-value="<%= documents_path %>"
+  data-cable-reconcile-url-value="<%= @deleted_view ? trash_documents_path : documents_path %>"
 >
   <%= turbo_stream_from "documents" %>
 
   <%= turbo_frame_tag "documents_index", target: "_top", data: { cable_reconcile_target: "frame" } do %>
     <header class="page-heading page-heading--split">
       <div>
-        <p class="eyebrow">Bibliothèque</p>
-        <h1>Documents</h1>
-        <p class="lead"><%= pluralize(@documents.size, "document", plural: "documents") %> dans l’espace de travail</p>
+        <p class="eyebrow"><%= @deleted_view ? "Corbeille" : "Bibliothèque" %></p>
+        <h1><%= @deleted_view ? "Documents supprimés" : "Documents" %></h1>
+        <p class="lead"><%= pluralize(@documents.size, "document", plural: "documents") %> <%= @deleted_view ? "dans la corbeille" : "dans l’espace de travail" %></p>
       </div>
-      <%= link_to "Nouveau document", root_path, class: "button" %>
+      <div class="page-heading__actions">
+        <%= link_to(@deleted_view ? "Documents actifs" : "Corbeille",
+          @deleted_view ? documents_path : trash_documents_path,
+          class: "button button--secondary") %>
+        <%= link_to "Nouveau document", root_path, class: "button" unless @deleted_view %>
+      </div>
     </header>
 
-    <section class="documents-panel" aria-label="Documents traités">
+    <section class="documents-panel" aria-label="<%= @deleted_view ? "Documents supprimés" : "Documents traités" %>">
       <% if @documents.empty? %>
         <div class="empty-state">
           <p class="empty-state__mark" aria-hidden="true">PDF</p>
@@ -31,18 +36,33 @@
         </div>
         <ol class="document-list">
           <% @documents.each do |document| %>
-            <% status = document.processing_status %>
-            <%= turbo_stream_from document if document.processing_status_transient? %>
+            <% status = @deleted_view ? { key: "discarded", label: "Supprimé" } : document.processing_status %>
+            <%= turbo_stream_from document if !@deleted_view && document.processing_status_transient? %>
             <li>
-              <%= link_to document_path(document), class: "document-link" do %>
+              <% document_content = capture do %>
                 <span class="document-identity">
                   <strong><%= document.source_pdf.filename %></strong>
                   <small>Document <%= document.id %></small>
                 </span>
                 <span class="status-badge status-badge--<%= status.fetch(:key) %>"><%= status.fetch(:label) %></span>
                 <time datetime="<%= document.created_at.iso8601 %>"><%= document.created_at.strftime("%d/%m/%Y %H:%M") %></time>
-                <span class="document-open">Consulter</span>
+                <span class="document-open"><%= @deleted_view ? "Supprimé" : "Consulter" %></span>
               <% end %>
+              <% if @deleted_view %>
+                <div class="document-link document-link--static"><%= document_content %></div>
+              <% else %>
+                <%= link_to document_path(document), class: "document-link" do %><%= document_content %><% end %>
+              <% end %>
+              <div class="document-actions">
+                <% if @deleted_view %>
+                  <%= button_to "Restaurer", restore_document_path(document), method: :post,
+                    class: "button button--secondary document-action", data: { turbo_frame: "_top" } %>
+                <% else %>
+                  <%= button_to "Supprimer", document_path(document), method: :delete,
+                    class: "button button--secondary document-action",
+                    data: { turbo_confirm: "Déplacer ce document dans la corbeille ?", turbo_frame: "_top" } %>
+                <% end %>
+              </div>
             </li>
           <% end %>
         </ol>

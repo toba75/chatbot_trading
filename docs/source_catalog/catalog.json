@@ -1,0 +1,5639 @@
+{
+  "documents": [
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "article",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "preuve textuelle locale",
+            "limites explicites de la revue"
+          ],
+          "level": "contextual"
+        },
+        "domains": [
+          "trend_following",
+          "market_history"
+        ],
+        "justification": "Le texte local identifie une étude historique des tendances industrielles ; elle apporte un angle documenté même sans édition commerciale résolue.",
+        "limitations": "Aucune correspondance fournisseur acceptée : l'identité commerciale, l'édition et la fraîcheur ne sont pas promues.",
+        "method": "lecture du texte local et de la page de titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [
+          "little_known_relevant"
+        ],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "A Century of Profitable Industry Trends Carlo Zarattini Gary Antonacci.pdf",
+      "lookup": {
+        "authors": [
+          "Carlo Zarattini",
+          "Gary Antonacci"
+        ],
+        "document_kind": "article",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "A Century of Profitable Industry Trends"
+      },
+      "provider_observations": [
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:11:32+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:A Century of Profitable Industry Trends inauthor:Carlo Zarattini",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3AA+Century+of+Profitable+Industry+Trends+inauthor%3ACarlo+Zarattini&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "no_match"
+      },
+      "source_sha256": "7a3001e2de57c3e028a5d36bbcfaa7fb773ae3b77a144aaefcd4cc221b1de03d",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Marcos Lopez de Prado"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1119482089"
+          ],
+          "isbn13": [
+            "9781119482086",
+            "9781119482109",
+            "9781119482116"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/48",
+              "page": 9
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/49",
+              "page": 9
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/50",
+              "page": 9
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:33+00:00",
+            "provider": "google_books",
+            "resource_id": "oU9KDwAAQBAJ"
+          }
+        ],
+        "publisher": "John Wiley & Sons",
+        "title": "Advances in Financial Machine Learning"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "machine_learning",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781119482086",
+            "9781119482116",
+            "9781119482109"
+          ],
+          "issn": []
+        },
+        "title": "Advances in Financial Machine Learning-Wiley (2018)"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Marcos Lopez de Prado"
+              ],
+              "candidate_id": "google_books:oU9KDwAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1119482089"
+                ],
+                "isbn13": [
+                  "9781119482086"
+                ]
+              },
+              "language": "en",
+              "page_count": 406,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:33+00:00",
+                "provider": "google_books",
+                "resource_id": "oU9KDwAAQBAJ"
+              },
+              "published_date": "2018-02-21",
+              "publisher": "John Wiley & Sons",
+              "rating": {
+                "average": 5.0,
+                "count": 1
+              },
+              "status": "accepted",
+              "subtitle": null,
+              "title": "Advances in Financial Machine Learning",
+              "volume_id": "oU9KDwAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:33+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781119482086",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781119482086&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:oU9KDwAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:33+00:00",
+          "provider": "google_books",
+          "resource_id": "oU9KDwAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "5a93ef385b4216c7859bd8e17401195a3aa70f91583f37984f56121e33e93305",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:33+00:00",
+            "provider": "google_books",
+            "resource_id": "oU9KDwAAQBAJ"
+          },
+          "value": "2018-02-21"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "aucun volume Google Books correspondant ; publication possiblement sans ISBN",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "alpha-trading-profitable-strategies-that-remove-directional-risk-wiley-trading-.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "alpha-trading-profitable-strategies-that-remove-directional-risk-wiley-trading-"
+      },
+      "provider_observations": [
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:11:34+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:alpha-trading-profitable-strategies-that-remove-directional-risk-wiley-trading-",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3Aalpha-trading-profitable-strategies-that-remove-directional-risk-wiley-trading-&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "no_match"
+      },
+      "source_sha256": "a9458052d3dd31671406eaa75d21e3e7e32cb5817c19d6cafdd1950defcebf11",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "identité d'édition non résolue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "bear-market-trading-strategies.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "bear-market-trading-strategies"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Joann Giesel"
+              ],
+              "candidate_id": "google_books:scWrzgEACAAJ",
+              "categories": [],
+              "identifiers": {
+                "isbn10": [],
+                "isbn13": [
+                  "9798701050868"
+                ]
+              },
+              "language": "en",
+              "page_count": 152,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:35+00:00",
+                "provider": "google_books",
+                "resource_id": "scWrzgEACAAJ"
+              },
+              "published_date": "2021-01-27",
+              "publisher": null,
+              "rating": null,
+              "status": "candidate",
+              "subtitle": "Bear Market Investing",
+              "title": "Bear Market Trading Strategies Guidebook: a Must-Read for Bear Market Dummies",
+              "volume_id": "scWrzgEACAAJ"
+            },
+            {
+              "authors": [
+                "Matthew R. Kratter"
+              ],
+              "candidate_id": "google_books:PxM9tgEACAAJ",
+              "categories": [],
+              "identifiers": {
+                "isbn10": [
+                  "1980635331"
+                ],
+                "isbn13": [
+                  "9781980635338"
+                ]
+              },
+              "language": "en",
+              "page_count": 62,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:35+00:00",
+                "provider": "google_books",
+                "resource_id": "PxM9tgEACAAJ"
+              },
+              "published_date": "2018-03-23",
+              "publisher": "Independently Published",
+              "rating": null,
+              "status": "candidate",
+              "subtitle": null,
+              "title": "Bear Market Trading Strategies",
+              "volume_id": "PxM9tgEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:35+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:bear-market-trading-strategies",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3Abear-market-trading-strategies&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "candidate"
+      },
+      "source_sha256": "9aff5d8d643604f1c7a414af82b6b97b4c55e9643655e2c8ecb42b0b9064189f",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Larry Connors",
+          "Connors Research"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0578206501"
+          ],
+          "isbn13": [
+            "9780578206509",
+            "9780578206516"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/12",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                6,
+                28
+              ],
+              "docling_ref": "#/texts/13",
+              "page": 4
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:36+00:00",
+            "provider": "google_books",
+            "resource_id": "3e9kuAEACAAJ"
+          }
+        ],
+        "publisher": null,
+        "title": "Buy the Fear, Sell the Greed"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "trading_practice"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "buy-the-fear-sell-the-greed-pdf-free.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780578206509",
+            "9780578206516"
+          ],
+          "issn": []
+        },
+        "title": "buy-the-fear-sell-the-greed-pdf-free"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Larry Connors",
+                "Connors Research"
+              ],
+              "candidate_id": "google_books:3e9kuAEACAAJ",
+              "categories": [],
+              "identifiers": {
+                "isbn10": [
+                  "0578206501"
+                ],
+                "isbn13": [
+                  "9780578206509"
+                ]
+              },
+              "language": "en",
+              "page_count": null,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:36+00:00",
+                "provider": "google_books",
+                "resource_id": "3e9kuAEACAAJ"
+              },
+              "published_date": "2018-08",
+              "publisher": null,
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "7 Behavioral Quant Strategies for Traders",
+              "title": "Buy the Fear, Sell the Greed",
+              "volume_id": "3e9kuAEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:36+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780578206509",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780578206509&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:3e9kuAEACAAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:36+00:00",
+          "provider": "google_books",
+          "resource_id": "3e9kuAEACAAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "da9c5f99b6c1d3b1af1d82bef109d4d358620aa09be6f0c5d7c93b7ac9ea37a0",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "month",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:36+00:00",
+            "provider": "google_books",
+            "resource_id": "3e9kuAEACAAJ"
+          },
+          "value": "2018-08"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Marcos M. López de Prado"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "100939729X"
+          ],
+          "isbn13": [
+            "9780262561457",
+            "9781009397292",
+            "9781009397315"
+          ],
+          "issn": [
+            "26318563",
+            "26318571"
+          ]
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                45,
+                58
+              ],
+              "docling_ref": "#/texts/20",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                13,
+                26
+              ],
+              "docling_ref": "#/texts/21",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                275,
+                288
+              ],
+              "docling_ref": "#/texts/829",
+              "page": 83
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                14
+              ],
+              "docling_ref": "#/texts/6",
+              "page": 1
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                24,
+                38
+              ],
+              "docling_ref": "#/texts/6",
+              "page": 1
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:37+00:00",
+            "provider": "google_books",
+            "resource_id": "hsUM0AEACAAJ"
+          }
+        ],
+        "publisher": "Cambridge University Press",
+        "title": "Causal Factor Investing"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "factor_investing",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "causal-factor-investing.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781009397292",
+            "9781009397315",
+            "9780262561457"
+          ],
+          "issn": [
+            "26318571",
+            "26318563"
+          ]
+        },
+        "title": "causal-factor-investing"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Marcos M. López de Prado"
+              ],
+              "candidate_id": "google_books:hsUM0AEACAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "100939729X"
+                ],
+                "isbn13": [
+                  "9781009397292"
+                ]
+              },
+              "language": "en",
+              "page_count": 0,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:37+00:00",
+                "provider": "google_books",
+                "resource_id": "hsUM0AEACAAJ"
+              },
+              "published_date": "2023-10-31",
+              "publisher": "Cambridge University Press",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "Can Factor Investing Become Scientific?",
+              "title": "Causal Factor Investing",
+              "volume_id": "hsUM0AEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:37+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781009397292",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781009397292&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:hsUM0AEACAAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:37+00:00",
+          "provider": "google_books",
+          "resource_id": "hsUM0AEACAAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "cf2215890cdd779fd97f5216d9fc04f68dbdda3bcec720d7a77274d4e2a2638a",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:37+00:00",
+            "provider": "google_books",
+            "resource_id": "hsUM0AEACAAJ"
+          },
+          "value": "2023-10-31"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Alexander Elder"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0471225347"
+          ],
+          "isbn13": [
+            "9780471225348"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                41,
+                59
+              ],
+              "docling_ref": "#/texts/25",
+              "page": 7
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:38+00:00",
+            "provider": "google_books",
+            "resource_id": "4_JqDwAAQBAJ"
+          }
+        ],
+        "publisher": "John Wiley & Sons",
+        "title": "Come Into My Trading Room"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management",
+          "trading_practice"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "come-into-my-trading-room-a-complete-guide-to-trading.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "0471225347"
+          ],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "come-into-my-trading-room-a-complete-guide-to-trading"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Alexander Elder"
+              ],
+              "candidate_id": "google_books:4_JqDwAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0471225347"
+                ],
+                "isbn13": [
+                  "9780471225348"
+                ]
+              },
+              "language": "en",
+              "page_count": 327,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:38+00:00",
+                "provider": "google_books",
+                "resource_id": "4_JqDwAAQBAJ"
+              },
+              "published_date": "2002-04-26",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "A Complete Guide to Trading",
+              "title": "Come Into My Trading Room",
+              "volume_id": "4_JqDwAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:38+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:0471225347",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A0471225347&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:4_JqDwAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:38+00:00",
+          "provider": "google_books",
+          "resource_id": "4_JqDwAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "7b4fe6cf42be3f207ff54420c6a3bb4110580118c11bb75036b4a919b7741b4e",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:38+00:00",
+            "provider": "google_books",
+            "resource_id": "4_JqDwAAQBAJ"
+          },
+          "value": "2002-04-26"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Joel Greenblatt"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0231552866"
+          ],
+          "isbn13": [
+            "9780231198905",
+            "9780231552868"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                153,
+                175
+              ],
+              "docling_ref": "#/texts/8",
+              "page": 6
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                157,
+                175
+              ],
+              "docling_ref": "#/texts/12",
+              "page": 6
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:38+00:00",
+            "provider": "google_books",
+            "resource_id": "erreDwAAQBAJ"
+          }
+        ],
+        "publisher": "Columbia University Press",
+        "title": "Common Sense"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "Common_Sense_-_Joel_Greenblatt.pdf",
+      "lookup": {
+        "authors": [
+          "Joel Greenblatt"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780231552868",
+            "9780231198905"
+          ],
+          "issn": []
+        },
+        "title": "Common Sense"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Joel Greenblatt"
+              ],
+              "candidate_id": "google_books:erreDwAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0231552866"
+                ],
+                "isbn13": [
+                  "9780231552868"
+                ]
+              },
+              "language": "en",
+              "page_count": 127,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:38+00:00",
+                "provider": "google_books",
+                "resource_id": "erreDwAAQBAJ"
+              },
+              "published_date": "2020-09-08",
+              "publisher": "Columbia University Press",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "The Investor's Guide to Equality, Opportunity, and Growth",
+              "title": "Common Sense",
+              "volume_id": "erreDwAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:38+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780231552868",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780231552868&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:erreDwAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:38+00:00",
+          "provider": "google_books",
+          "resource_id": "erreDwAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "36d6a460e07d0e66a2294f775d730052e284db5297dab156eda3ebaf7b20f797",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:38+00:00",
+            "provider": "google_books",
+            "resource_id": "erreDwAAQBAJ"
+          },
+          "value": "2020-09-08"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Gary Antonacci"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0071849440",
+            "0071849459"
+          ],
+          "isbn13": [
+            "9780071849449",
+            "9780071849456"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                13
+              ],
+              "docling_ref": "#/texts/30",
+              "page": 7
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                107,
+                120
+              ],
+              "docling_ref": "#/texts/31",
+              "page": 7
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                23
+              ],
+              "docling_ref": "#/texts/28",
+              "page": 7
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                76,
+                99
+              ],
+              "docling_ref": "#/texts/31",
+              "page": 7
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:39+00:00",
+            "provider": "google_books",
+            "resource_id": "PVGoBAAAQBAJ"
+          }
+        ],
+        "publisher": "McGraw Hill Professional",
+        "title": "Dual Momentum Investing: An Innovative Strategy for Higher Returns with Lower Risk"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "momentum",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "dual-momentum-investing-an-innovative-strategy-for-higher-returns-with-lower-risk.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "0071849459",
+            "0071849440"
+          ],
+          "isbn13": [
+            "9780071849456",
+            "9780071849449"
+          ],
+          "issn": []
+        },
+        "title": "dual-momentum-investing-an-innovative-strategy-for-higher-returns-with-lower-risk"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Gary Antonacci"
+              ],
+              "candidate_id": "google_books:PVGoBAAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0071849459"
+                ],
+                "isbn13": [
+                  "9780071849456"
+                ]
+              },
+              "language": "en",
+              "page_count": 238,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:39+00:00",
+                "provider": "google_books",
+                "resource_id": "PVGoBAAAQBAJ"
+              },
+              "published_date": "2014-11-21",
+              "publisher": "McGraw Hill Professional",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": null,
+              "title": "Dual Momentum Investing: An Innovative Strategy for Higher Returns with Lower Risk",
+              "volume_id": "PVGoBAAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:39+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780071849456",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780071849456&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:PVGoBAAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:39+00:00",
+          "provider": "google_books",
+          "resource_id": "PVGoBAAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "8c536df8808f9e1988fa25795ee6774060cd8f0998d8ff5063f3c7ad16400475",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:39+00:00",
+            "provider": "google_books",
+            "resource_id": "PVGoBAAAQBAJ"
+          },
+          "value": "2014-11-21"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780578530840",
+            "9781792313394"
+          ],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/18",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                6,
+                28
+              ],
+              "docling_ref": "#/texts/19",
+              "page": 4
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "identité d'édition non résolue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "ebin.pub_the-alpha-formula-high-powered-strategies-to-beat-the-market-with-less-risk-9780578530840-9781792313394.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780578530840",
+            "9781792313394"
+          ],
+          "issn": []
+        },
+        "title": "ebin the-alpha-formula-high-powered-strategies-to-beat-the-market-with-less-risk-9780578530840-9781792313394"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Chris Cain",
+                "Larry Connors",
+                "Connors Research"
+              ],
+              "candidate_id": "google_books:DO2MxgEACAAJ",
+              "categories": [],
+              "identifiers": {
+                "isbn10": [
+                  "0578530848"
+                ],
+                "isbn13": [
+                  "9780578530840"
+                ]
+              },
+              "language": "en",
+              "page_count": null,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:40+00:00",
+                "provider": "google_books",
+                "resource_id": "DO2MxgEACAAJ"
+              },
+              "published_date": "2019-08-15",
+              "publisher": null,
+              "rating": {
+                "average": 5.0,
+                "count": 1
+              },
+              "status": "rejected",
+              "subtitle": "Beat the Market with Significantly Less Risk",
+              "title": "The Alpha Formula",
+              "volume_id": "DO2MxgEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:40+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780578530840",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780578530840&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "rejected"
+      },
+      "source_sha256": "e3b5dcb43882a6372bc15978368528dc236388cae04d44253f4dc8e952b53e90",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [
+            "0471678058"
+          ],
+          "isbn13": [
+            "9780471678052"
+          ],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/23",
+              "page": 6
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                26
+              ],
+              "docling_ref": "#/texts/22",
+              "page": 6
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "identité d'édition non résolue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "entries-exits-visits-to-16-trading-rooms-wiley-trading.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "0471678058"
+          ],
+          "isbn13": [
+            "9780471678052"
+          ],
+          "issn": []
+        },
+        "title": "entries-exits-visits-to-16-trading-rooms-wiley-trading"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Alexander Elder"
+              ],
+              "candidate_id": "google_books:kBPWBgAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0471678058"
+                ],
+                "isbn13": [
+                  "9780471678052"
+                ]
+              },
+              "language": "en",
+              "page_count": 356,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:41+00:00",
+                "provider": "google_books",
+                "resource_id": "kBPWBgAAQBAJ"
+              },
+              "published_date": "2006-05-01",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": "Visits to Sixteen Trading Rooms",
+              "title": "Entries and Exits",
+              "volume_id": "kBPWBgAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:41+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780471678052",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780471678052&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "rejected"
+      },
+      "source_sha256": "58fa7c2fabbd8fa93ffbdf925fac282d890b793c935812252c96a7f29b44a04a",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "David Easley",
+          "Marcos López de Prado",
+          "Maureen O'Hara"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "178272009X"
+          ],
+          "isbn13": [
+            "9781782720096"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/13",
+              "page": 5
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:42+00:00",
+            "provider": "google_books",
+            "resource_id": "pli5oAEACAAJ"
+          }
+        ],
+        "publisher": null,
+        "title": "High-frequency Trading"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "trading_practice"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "high-frequency-trading-maureen-o-mara-pdf-free.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781782720096"
+          ],
+          "issn": []
+        },
+        "title": "high-frequency-trading-maureen-o-mara-pdf-free"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "David Easley",
+                "Marcos López de Prado",
+                "Maureen O'Hara"
+              ],
+              "candidate_id": "google_books:pli5oAEACAAJ",
+              "categories": [
+                "Electronic trading of securities"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "178272009X"
+                ],
+                "isbn13": [
+                  "9781782720096"
+                ]
+              },
+              "language": "en",
+              "page_count": 236,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:42+00:00",
+                "provider": "google_books",
+                "resource_id": "pli5oAEACAAJ"
+              },
+              "published_date": "2013-09-30",
+              "publisher": null,
+              "rating": null,
+              "status": "accepted",
+              "subtitle": null,
+              "title": "High-frequency Trading",
+              "volume_id": "pli5oAEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:42+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781782720096",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781782720096&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:pli5oAEACAAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:42+00:00",
+          "provider": "google_books",
+          "resource_id": "pli5oAEACAAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "5dc0ce50d3b6f2ea2509e25205600dd0f2f0dc6a7ee66c777300bf52eaf0a7ad",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:42+00:00",
+            "provider": "google_books",
+            "resource_id": "pli5oAEACAAJ"
+          },
+          "value": "2013-09-30"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Larry Connors"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1118166507",
+            "9734947311"
+          ],
+          "isbn13": [
+            "9781118166505",
+            "9781118226285",
+            "9781118239452",
+            "9781118264201"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                251,
+                263
+              ],
+              "docling_ref": "#/texts/10698",
+              "page": 164
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/21",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                32,
+                54
+              ],
+              "docling_ref": "#/texts/21",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/22",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                30,
+                52
+              ],
+              "docling_ref": "#/texts/22",
+              "page": 4
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:43+00:00",
+            "provider": "google_books",
+            "resource_id": "BFBlAQAACAAJ"
+          }
+        ],
+        "publisher": "Wiley",
+        "title": "How Markets Really Work"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "market_structure",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "How Markets Really Work_ Quantitative Guide to Stock Market Behavior.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "9734947311"
+          ],
+          "isbn13": [
+            "9781118166505",
+            "9781118226285",
+            "9781118239452",
+            "9781118264201"
+          ],
+          "issn": []
+        },
+        "title": "How Markets Really Work Quantitative Guide to Stock Market Behavior"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Larry Connors"
+              ],
+              "candidate_id": "google_books:BFBlAQAACAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1118166507"
+                ],
+                "isbn13": [
+                  "9781118166505"
+                ]
+              },
+              "language": "en",
+              "page_count": 192,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:43+00:00",
+                "provider": "google_books",
+                "resource_id": "BFBlAQAACAAJ"
+              },
+              "published_date": "2012-03-06",
+              "publisher": "Wiley",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "Quantitative Guide to Stock Market Behavior",
+              "title": "How Markets Really Work",
+              "volume_id": "BFBlAQAACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:43+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781118166505",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781118166505&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:BFBlAQAACAAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:43+00:00",
+          "provider": "google_books",
+          "resource_id": "BFBlAQAACAAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "c3596216a0bffe8f2b519ffb15cd035e645dbced05ba73133925be3c7ed5eb3a",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:43+00:00",
+            "provider": "google_books",
+            "resource_id": "BFBlAQAACAAJ"
+          },
+          "value": "2012-03-06"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Ray Dalio"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1501124064"
+          ],
+          "isbn13": [
+            "9781501124068",
+            "9781501124075"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/1958",
+              "page": 395
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                23,
+                45
+              ],
+              "docling_ref": "#/texts/1958",
+              "page": 395
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:44+00:00",
+            "provider": "google_books",
+            "resource_id": "0K9bEQAAQBAJ"
+          }
+        ],
+        "publisher": "Simon and Schuster",
+        "title": "How Countries Go Broke"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "How_Countries_Go_Broke_The_Big_Cycle_-_Ray_Dalio.pdf",
+      "lookup": {
+        "authors": [
+          "Ray Dalio"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781501124068",
+            "9781501124075"
+          ],
+          "issn": []
+        },
+        "title": "How Countries Go Broke The Big Cycle"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Ray Dalio"
+              ],
+              "candidate_id": "google_books:0K9bEQAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1501124064"
+                ],
+                "isbn13": [
+                  "9781501124068"
+                ]
+              },
+              "language": "en",
+              "page_count": 400,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:44+00:00",
+                "provider": "google_books",
+                "resource_id": "0K9bEQAAQBAJ"
+              },
+              "published_date": "2025-06-03",
+              "publisher": "Simon and Schuster",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "The Big Cycle",
+              "title": "How Countries Go Broke",
+              "volume_id": "0K9bEQAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:44+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781501124068",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781501124068&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:0K9bEQAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:44+00:00",
+          "provider": "google_books",
+          "resource_id": "0K9bEQAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "032d54c949ea550e05878ce458e67f65f34faf2830ea9105ea7a15b6b8f5dd8c",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:44+00:00",
+            "provider": "google_books",
+            "resource_id": "0K9bEQAAQBAJ"
+          },
+          "value": "2025-06-03"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [
+            "1947313894"
+          ],
+          "isbn13": [
+            "9781947313897"
+          ],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                24,
+                43
+              ],
+              "docling_ref": "#/texts/15",
+              "page": 2
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                23
+              ],
+              "docling_ref": "#/texts/15",
+              "page": 2
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "aucun volume Google Books correspondant ; publication possiblement sans ISBN",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "HowtoMasterManagedFutures-electronic.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "1947313894"
+          ],
+          "isbn13": [
+            "9781947313897"
+          ],
+          "issn": []
+        },
+        "title": "HowtoMasterManagedFutures-electronic"
+      },
+      "provider_observations": [
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:11:45+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781947313897",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781947313897&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        },
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:11:45+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:1947313894",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A1947313894&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        },
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:11:46+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:HowtoMasterManagedFutures-electronic",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3AHowtoMasterManagedFutures-electronic&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "no_match"
+      },
+      "source_sha256": "dc42c851d977c6b961c64fdf82a89356e140947cd549f6facf30b65fe0ce1ca3",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Marcos López de Prado"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1108792898"
+          ],
+          "isbn13": [
+            "9781108792899",
+            "9781108883658"
+          ],
+          "issn": [
+            "26318563",
+            "26318571"
+          ]
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                45,
+                58
+              ],
+              "docling_ref": "#/texts/20",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                72,
+                85
+              ],
+              "docling_ref": "#/texts/20",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                14
+              ],
+              "docling_ref": "#/texts/4",
+              "page": 1
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                24,
+                38
+              ],
+              "docling_ref": "#/texts/4",
+              "page": 1
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:47+00:00",
+            "provider": "google_books",
+            "resource_id": "ow7fywEACAAJ"
+          }
+        ],
+        "publisher": "Cambridge University Press",
+        "title": "Machine Learning for Asset Managers"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "machine_learning",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "machine-learning-for-asset-managers.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781108792899",
+            "9781108883658"
+          ],
+          "issn": [
+            "26318571",
+            "26318563"
+          ]
+        },
+        "title": "machine-learning-for-asset-managers"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Marcos López de Prado"
+              ],
+              "candidate_id": "google_books:ow7fywEACAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1108792898"
+                ],
+                "isbn13": [
+                  "9781108792899"
+                ]
+              },
+              "language": "en",
+              "page_count": 75,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:47+00:00",
+                "provider": "google_books",
+                "resource_id": "ow7fywEACAAJ"
+              },
+              "published_date": "2020-04-30",
+              "publisher": "Cambridge University Press",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": null,
+              "title": "Machine Learning for Asset Managers",
+              "volume_id": "ow7fywEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:47+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781108792899",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781108792899&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:ow7fywEACAAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:47+00:00",
+          "provider": "google_books",
+          "resource_id": "ow7fywEACAAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "ac101c48f631d2beee4ec4fa4a27c526efa5c0e20e9b02f00b5214107eba6c5a",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:47+00:00",
+            "provider": "google_books",
+            "resource_id": "ow7fywEACAAJ"
+          },
+          "value": "2020-04-30"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "identité d'édition non résolue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "Margin_of_Safety__Risk-Averse_Value_Invest_-_Seth_A_Klarman.pdf",
+      "lookup": {
+        "authors": [
+          "Seth A Klarman"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "Margin of Safety Risk-Averse Value Invest"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Seth A. Klarman"
+              ],
+              "candidate_id": "google_books:1QpjAAAACAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0887305105"
+                ],
+                "isbn13": [
+                  "9780887305108"
+                ]
+              },
+              "language": "en",
+              "page_count": 249,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:48+00:00",
+                "provider": "google_books",
+                "resource_id": "1QpjAAAACAAJ"
+              },
+              "published_date": "1991",
+              "publisher": "Harpercollins",
+              "rating": {
+                "average": 4.5,
+                "count": 7
+              },
+              "status": "rejected",
+              "subtitle": "Risk-averse Value Investing Strategies for the Thoughtful Investor",
+              "title": "Margin of Safety",
+              "volume_id": "1QpjAAAACAAJ"
+            },
+            {
+              "authors": [
+                "SETH. KLARMAN"
+              ],
+              "candidate_id": "google_books:l2GEzwEACAAJ",
+              "categories": [],
+              "identifiers": {
+                "isbn10": [
+                  "1471059855"
+                ],
+                "isbn13": [
+                  "9781471059858"
+                ]
+              },
+              "language": "en",
+              "page_count": 0,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:48+00:00",
+                "provider": "google_books",
+                "resource_id": "l2GEzwEACAAJ"
+              },
+              "published_date": "2022",
+              "publisher": null,
+              "rating": null,
+              "status": "rejected",
+              "subtitle": null,
+              "title": "MARGIN OF SAFETY.",
+              "volume_id": "l2GEzwEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:48+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:Margin of Safety Risk-Averse Value Invest inauthor:Seth A Klarman",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3AMargin+of+Safety+Risk-Averse+Value+Invest+inauthor%3ASeth+A+Klarman&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "rejected"
+      },
+      "source_sha256": "e7c1dcba5c3d86bb48c6ddea4591adf2669ec8368a64caf1ff2087beb6d553dc",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "James F. Dalton"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1394318898"
+          ],
+          "isbn13": [
+            "9781394318810",
+            "9781394318827",
+            "9781394318896"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                18
+              ],
+              "docling_ref": "#/texts/155",
+              "page": 13
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                18
+              ],
+              "docling_ref": "#/texts/156",
+              "page": 13
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                18
+              ],
+              "docling_ref": "#/texts/157",
+              "page": 13
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:49+00:00",
+            "provider": "google_books",
+            "resource_id": "s2s3EQAAQBAJ"
+          }
+        ],
+        "publisher": "John Wiley & Sons",
+        "title": "Markets & Momentum"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "market_structure",
+          "momentum",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "Markets_and_Momentum_-_James_F_Dalton.pdf",
+      "lookup": {
+        "authors": [
+          "James F Dalton"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781394318896",
+            "9781394318827",
+            "9781394318810"
+          ],
+          "issn": []
+        },
+        "title": "Markets and Momentum"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "James F. Dalton"
+              ],
+              "candidate_id": "google_books:s2s3EQAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1394318898"
+                ],
+                "isbn13": [
+                  "9781394318896"
+                ]
+              },
+              "language": "en",
+              "page_count": 295,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:49+00:00",
+                "provider": "google_books",
+                "resource_id": "s2s3EQAAQBAJ"
+              },
+              "published_date": "2025-02-11",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "How Profiling Gives Traders an Advantage",
+              "title": "Markets & Momentum",
+              "volume_id": "s2s3EQAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:49+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781394318896",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781394318896&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:s2s3EQAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:49+00:00",
+          "provider": "google_books",
+          "resource_id": "s2s3EQAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "e620456a6285f469779110ce06fc5e33bb31f624d869c07014bbe336e7311692",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:49+00:00",
+            "provider": "google_books",
+            "resource_id": "s2s3EQAAQBAJ"
+          },
+          "value": "2025-02-11"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Howard Marks"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1328480569"
+          ],
+          "isbn13": [
+            "9781328479259",
+            "9781328480569"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                309,
+                327
+              ],
+              "docling_ref": "#/texts/40",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                338,
+                356
+              ],
+              "docling_ref": "#/texts/40",
+              "page": 4
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:49+00:00",
+            "provider": "google_books",
+            "resource_id": "8hhDDwAAQBAJ"
+          }
+        ],
+        "publisher": "HarperCollins",
+        "title": "Mastering The Market Cycle"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "market_structure",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "Mastering_the_Market_Cycle_-_Howard_Marks.pdf",
+      "lookup": {
+        "authors": [
+          "Howard Marks"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781328480569",
+            "9781328479259"
+          ],
+          "issn": []
+        },
+        "title": "Mastering the Market Cycle"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Howard Marks"
+              ],
+              "candidate_id": "google_books:8hhDDwAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1328480569"
+                ],
+                "isbn13": [
+                  "9781328480569"
+                ]
+              },
+              "language": "en",
+              "page_count": 339,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:49+00:00",
+                "provider": "google_books",
+                "resource_id": "8hhDDwAAQBAJ"
+              },
+              "published_date": "2018-10-02",
+              "publisher": "HarperCollins",
+              "rating": {
+                "average": 2.0,
+                "count": 1
+              },
+              "status": "accepted",
+              "subtitle": "Getting the Odds on Your Side",
+              "title": "Mastering The Market Cycle",
+              "volume_id": "8hhDDwAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:49+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781328480569",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781328480569&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:8hhDDwAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:49+00:00",
+          "provider": "google_books",
+          "resource_id": "8hhDDwAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "3715ceac073f5576f8adc243c1a1e8d835ae54b7060b04ac654eaf8fd489b5d8",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:49+00:00",
+            "provider": "google_books",
+            "resource_id": "8hhDDwAAQBAJ"
+          },
+          "value": "2018-10-02"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "article",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "identité d'édition non résolue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "Optimal Trend Following Rules in Two State Switching Regime Models.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "article",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "Optimal Trend Following Rules in Two State Switching Regime Models"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Giorgio Consigli",
+                "Daniel Kuhn",
+                "Paolo Brandimarte"
+              ],
+              "candidate_id": "google_books:5fNGDQAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "3319416138"
+                ],
+                "isbn13": [
+                  "9783319416137"
+                ]
+              },
+              "language": "en",
+              "page_count": 310,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:50+00:00",
+                "provider": "google_books",
+                "resource_id": "5fNGDQAAQBAJ"
+              },
+              "published_date": "2016-10-17",
+              "publisher": "Springer",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": null,
+              "title": "Optimal Financial Decision Making under Uncertainty",
+              "volume_id": "5fNGDQAAQBAJ"
+            },
+            {
+              "authors": [
+                "Ramesh K. Agarwal"
+              ],
+              "candidate_id": "google_books:nfDLEAAAQBAJ",
+              "categories": [
+                "Technology & Engineering"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "283253001X"
+                ],
+                "isbn13": [
+                  "9782832530016"
+                ]
+              },
+              "language": "en",
+              "page_count": 236,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:50+00:00",
+                "provider": "google_books",
+                "resource_id": "nfDLEAAAQBAJ"
+              },
+              "published_date": "2023-07-19",
+              "publisher": "Frontiers Media SA",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": null,
+              "title": "Optimal Design and Efficiency Improvement of Fluid Machinery and Systems",
+              "volume_id": "nfDLEAAAQBAJ"
+            },
+            {
+              "authors": [
+                "Leilei Ji",
+                "Ramesh K. Agarwal",
+                "Kan Kan",
+                "Yongfei Yang",
+                "Ran Tao",
+                "Yang Yang",
+                "Alexandre Presas"
+              ],
+              "candidate_id": "google_books:4QSGEQAAQBAJ",
+              "categories": [
+                "Technology & Engineering"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "2832567010"
+                ],
+                "isbn13": [
+                  "9782832567012"
+                ]
+              },
+              "language": "en",
+              "page_count": 194,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:50+00:00",
+                "provider": "google_books",
+                "resource_id": "4QSGEQAAQBAJ"
+              },
+              "published_date": "2025-09-12",
+              "publisher": "Frontiers Media SA",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": null,
+              "title": "Optimal Design and Efficiency Improvement of Fluid Machinery and Systems, volume II",
+              "volume_id": "4QSGEQAAQBAJ"
+            },
+            {
+              "authors": [
+                "Min Dai"
+              ],
+              "candidate_id": "google_books:amoXzwEACAAJ",
+              "categories": [],
+              "identifiers": {
+                "isbn10": [],
+                "isbn13": []
+              },
+              "language": "en",
+              "page_count": 20,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:50+00:00",
+                "provider": "google_books",
+                "resource_id": "amoXzwEACAAJ"
+              },
+              "published_date": "2015",
+              "publisher": null,
+              "rating": null,
+              "status": "rejected",
+              "subtitle": null,
+              "title": "Optimal Trend Following Trading Rules",
+              "volume_id": "amoXzwEACAAJ"
+            },
+            {
+              "authors": [
+                "Minh-Man Ngo"
+              ],
+              "candidate_id": "google_books:BLgozwEACAAJ",
+              "categories": [],
+              "identifiers": {
+                "isbn10": [],
+                "isbn13": []
+              },
+              "language": "en",
+              "page_count": 26,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:50+00:00",
+                "provider": "google_books",
+                "resource_id": "BLgozwEACAAJ"
+              },
+              "published_date": "2014",
+              "publisher": null,
+              "rating": null,
+              "status": "rejected",
+              "subtitle": "A Viscosity Solutions Approach",
+              "title": "Optimal Switching for Pairs Trading Rule",
+              "volume_id": "BLgozwEACAAJ"
+            },
+            {
+              "authors": [
+                "Phong Thanh Luu"
+              ],
+              "candidate_id": "google_books:avfXtwEACAAJ",
+              "categories": [],
+              "identifiers": {
+                "isbn10": [],
+                "isbn13": []
+              },
+              "language": "en",
+              "page_count": 276,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:50+00:00",
+                "provider": "google_books",
+                "resource_id": "avfXtwEACAAJ"
+              },
+              "published_date": "2016",
+              "publisher": null,
+              "rating": null,
+              "status": "rejected",
+              "subtitle": null,
+              "title": "Optimal Pairs Trading Rules and Numerical Methods",
+              "volume_id": "avfXtwEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:50+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:Optimal Trend Following Rules in Two State Switching Regime Models",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3AOptimal+Trend+Following+Rules+in+Two+State+Switching+Regime+Models&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "rejected"
+      },
+      "source_sha256": "e3f57432a5f1d0e506867a0c273fb6ae72bc23a6d46c6d40d87a7aad98e6a881",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Wesley R. Gray",
+          "Jack R. Vogel"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "111923719X"
+          ],
+          "isbn13": [
+            "9781119237198",
+            "9781119237259",
+            "9781119237266"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                65,
+                83
+              ],
+              "docling_ref": "#/texts/502",
+              "page": 12
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                94,
+                112
+              ],
+              "docling_ref": "#/texts/502",
+              "page": 12
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                121,
+                139
+              ],
+              "docling_ref": "#/texts/502",
+              "page": 12
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:51+00:00",
+            "provider": "google_books",
+            "resource_id": "K2npCgAAQBAJ"
+          }
+        ],
+        "publisher": "John Wiley & Sons",
+        "title": "Quantitative Momentum"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "momentum",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "Quantitative_Momentum_-_Wesley_R_Gray.pdf",
+      "lookup": {
+        "authors": [
+          "Wesley R Gray"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781119237198",
+            "9781119237266",
+            "9781119237259"
+          ],
+          "issn": []
+        },
+        "title": "Quantitative Momentum"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Wesley R. Gray",
+                "Jack R. Vogel"
+              ],
+              "candidate_id": "google_books:K2npCgAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "111923719X"
+                ],
+                "isbn13": [
+                  "9781119237198"
+                ]
+              },
+              "language": "en",
+              "page_count": 215,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:51+00:00",
+                "provider": "google_books",
+                "resource_id": "K2npCgAAQBAJ"
+              },
+              "published_date": "2016-10-03",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+              "title": "Quantitative Momentum",
+              "volume_id": "K2npCgAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:51+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781119237198",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781119237198&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:K2npCgAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:51+00:00",
+          "provider": "google_books",
+          "resource_id": "K2npCgAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "94c0a6ca1a772f0daf99dca375db81ed34432e73dfdb28c6bdb7b681da8b7f02",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:51+00:00",
+            "provider": "google_books",
+            "resource_id": "K2npCgAAQBAJ"
+          },
+          "value": "2016-10-03"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Wesley R. Gray",
+          "Tobias E. Carlisle"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1118328078"
+          ],
+          "isbn13": [
+            "9781118328071",
+            "9781118416556",
+            "9781118420003"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/67",
+              "page": 10
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                32,
+                54
+              ],
+              "docling_ref": "#/texts/67",
+              "page": 10
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                62,
+                84
+              ],
+              "docling_ref": "#/texts/67",
+              "page": 10
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:52+00:00",
+            "provider": "google_books",
+            "resource_id": "AHfz_4uArwYC"
+          }
+        ],
+        "publisher": "John Wiley & Sons",
+        "title": "Quantitative Value, + Web Site"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management",
+          "value_investing"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "Quantitative_value_-_Wesley_gray.pdf",
+      "lookup": {
+        "authors": [
+          "Wesley gray"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781118328071",
+            "9781118420003",
+            "9781118416556"
+          ],
+          "issn": []
+        },
+        "title": "Quantitative value"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Wesley R. Gray",
+                "Tobias E. Carlisle"
+              ],
+              "candidate_id": "google_books:AHfz_4uArwYC",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1118328078"
+                ],
+                "isbn13": [
+                  "9781118328071"
+                ]
+              },
+              "language": "en",
+              "page_count": 293,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:52+00:00",
+                "provider": "google_books",
+                "resource_id": "AHfz_4uArwYC"
+              },
+              "published_date": "2012-12-26",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "A Practitioner's Guide to Automating Intelligent Investment and Eliminating Behavioral Errors",
+              "title": "Quantitative Value, + Web Site",
+              "volume_id": "AHfz_4uArwYC"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:52+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781118328071",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781118328071&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:AHfz_4uArwYC",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:52+00:00",
+          "provider": "google_books",
+          "resource_id": "AHfz_4uArwYC"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "efd718f770f8c4ece864580d7bde522be6e55aace0d3fb93cc49fc7b7add7a90",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:52+00:00",
+            "provider": "google_books",
+            "resource_id": "AHfz_4uArwYC"
+          },
+          "value": "2012-12-26"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "aucun volume Google Books correspondant ; publication possiblement sans ISBN",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "systemic-liquidity-risk-and-bipolar-markets-wealth-management-in-todays-macro-risk-on-risk-off-financial-environment.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "systemic-liquidity-risk-and-bipolar-markets-wealth-management-in-todays-macro-risk-on-risk-off-financial-environment"
+      },
+      "provider_observations": [
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:11:53+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:systemic-liquidity-risk-and-bipolar-markets-wealth-management-in-todays-macro-risk-on-risk-off-financial-environment",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3Asystemic-liquidity-risk-and-bipolar-markets-wealth-management-in-todays-macro-risk-on-risk-off-financial-environment&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "no_match"
+      },
+      "source_sha256": "0f7e74043e6039e94b634bff4d1f01964d0214f0bde59eabf109dbfcaefe7606",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Robert Pardo"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0470128011"
+          ],
+          "isbn13": [
+            "9780470128015"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/45",
+              "page": 9
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:54+00:00",
+            "provider": "google_books",
+            "resource_id": "6UjKCQAAQBAJ"
+          }
+        ],
+        "publisher": "John Wiley & Sons",
+        "title": "The Evaluation and Optimization of Trading Strategies"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management",
+          "trading_practice"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "the-evaluation-and-optimization-of-trading-strategies.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780470128015"
+          ],
+          "issn": []
+        },
+        "title": "the-evaluation-and-optimization-of-trading-strategies"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Robert Pardo"
+              ],
+              "candidate_id": "google_books:6UjKCQAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0470128011"
+                ],
+                "isbn13": [
+                  "9780470128015"
+                ]
+              },
+              "language": "en",
+              "page_count": 373,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:54+00:00",
+                "provider": "google_books",
+                "resource_id": "6UjKCQAAQBAJ"
+              },
+              "published_date": "2008-02-08",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": null,
+              "title": "The Evaluation and Optimization of Trading Strategies",
+              "volume_id": "6UjKCQAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:54+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780470128015",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780470128015&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:6UjKCQAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:54+00:00",
+          "provider": "google_books",
+          "resource_id": "6UjKCQAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "70ae7f6bf008badaaf9871bc8706452b719f9ee866262687a0b75017254e04e3",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:54+00:00",
+            "provider": "google_books",
+            "resource_id": "6UjKCQAAQBAJ"
+          },
+          "value": "2008-02-08"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781118443927",
+            "9781118963678",
+            "9781118963685"
+          ],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/24",
+              "page": 6
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/25",
+              "page": 6
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/26",
+              "page": 6
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "identité d'édition non résolue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "the-new-trading-for-a-living-psychology-discipline-trading-tools-and-systems-risk-control-trade-management.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781118443927",
+            "9781118963678",
+            "9781118963685"
+          ],
+          "issn": []
+        },
+        "title": "the-new-trading-for-a-living-psychology-discipline-trading-tools-and-systems-risk-control-trade-management"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Alexander Elder"
+              ],
+              "candidate_id": "google_books:p28TBwAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1118443926"
+                ],
+                "isbn13": [
+                  "9781118443927"
+                ]
+              },
+              "language": "en",
+              "page_count": 309,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:54+00:00",
+                "provider": "google_books",
+                "resource_id": "p28TBwAAQBAJ"
+              },
+              "published_date": "2014-10-27",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": "Psychology, Discipline, Trading Tools and Systems, Risk Control, Trade Management",
+              "title": "The New Trading for a Living",
+              "volume_id": "p28TBwAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:54+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781118443927",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781118443927&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "rejected"
+      },
+      "source_sha256": "78a4b443a64326a230a1cfe4142d5a2407f07619bba79a687ac6c08255341f51",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "aucun volume Google Books correspondant ; publication possiblement sans ISBN",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "the-original-turtle-trading-rules.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "the-original-turtle-trading-rules"
+      },
+      "provider_observations": [
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:11:55+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:the-original-turtle-trading-rules",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3Athe-original-turtle-trading-rules&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "no_match"
+      },
+      "source_sha256": "073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Tobias E. Carlisle"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0692928855"
+          ],
+          "isbn13": [
+            "9780692928851"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                57,
+                73
+              ],
+              "docling_ref": "#/texts/34",
+              "page": 2
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                74,
+                97
+              ],
+              "docling_ref": "#/texts/34",
+              "page": 2
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:55+00:00",
+            "provider": "google_books",
+            "resource_id": "QRMHtAEACAAJ"
+          }
+        ],
+        "publisher": null,
+        "title": "The Acquirer's Multiple"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management",
+          "value_investing"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "The_Acquirers_Multiple_-_Tobias_E_Carlisle.pdf",
+      "lookup": {
+        "authors": [
+          "Tobias E Carlisle"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "0692928855"
+          ],
+          "isbn13": [
+            "9780692928851"
+          ],
+          "issn": []
+        },
+        "title": "The Acquirers Multiple"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Tobias E. Carlisle"
+              ],
+              "candidate_id": "google_books:QRMHtAEACAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0692928855"
+                ],
+                "isbn13": [
+                  "9780692928851"
+                ]
+              },
+              "language": "en",
+              "page_count": 160,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:55+00:00",
+                "provider": "google_books",
+                "resource_id": "QRMHtAEACAAJ"
+              },
+              "published_date": "2017-10-16",
+              "publisher": null,
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "How the Billionaire Contrarians of Deep Value Beat the Market",
+              "title": "The Acquirer's Multiple",
+              "volume_id": "QRMHtAEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:55+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780692928851",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780692928851&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:QRMHtAEACAAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:55+00:00",
+          "provider": "google_books",
+          "resource_id": "QRMHtAEACAAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "8243ceb960361c57ab51059aa4c73bacb2e8c2de3d78289316e10939000292e6",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:55+00:00",
+            "provider": "google_books",
+            "resource_id": "QRMHtAEACAAJ"
+          },
+          "value": "2017-10-16"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Joel Greenblatt"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0307720780"
+          ],
+          "isbn13": [
+            "9780307720788"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                24
+              ],
+              "docling_ref": "#/texts/19",
+              "page": 3
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:56+00:00",
+            "provider": "google_books",
+            "resource_id": "peaJHFYxGEoC"
+          }
+        ],
+        "publisher": "Crown Currency",
+        "title": "The Big Secret for the Small Investor"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [
+          "classic_still_relevant"
+        ],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "The_Big_Secret_for_the_Small_Investor_-_Joel_Greenblatt.pdf",
+      "lookup": {
+        "authors": [
+          "Joel Greenblatt"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780307720788"
+          ],
+          "issn": []
+        },
+        "title": "The Big Secret for the Small Investor"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Joel Greenblatt"
+              ],
+              "candidate_id": "google_books:peaJHFYxGEoC",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0307720780"
+                ],
+                "isbn13": [
+                  "9780307720788"
+                ]
+              },
+              "language": "en",
+              "page_count": 162,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:56+00:00",
+                "provider": "google_books",
+                "resource_id": "peaJHFYxGEoC"
+              },
+              "published_date": "2011-04-12",
+              "publisher": "Crown Currency",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "A New Route to Long-Term Investment Success",
+              "title": "The Big Secret for the Small Investor",
+              "volume_id": "peaJHFYxGEoC"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:56+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780307720788",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780307720788&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:peaJHFYxGEoC",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:56+00:00",
+          "provider": "google_books",
+          "resource_id": "peaJHFYxGEoC"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "00e4765c6f0b899319a4e113286e01ea4ab5c8f1d097edc107e24813304b7302",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:56+00:00",
+            "provider": "google_books",
+            "resource_id": "peaJHFYxGEoC"
+          },
+          "value": "2011-04-12"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Howard Marks"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "023153079X"
+          ],
+          "isbn13": [
+            "9780231162845",
+            "9780231530798"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                52,
+                74
+              ],
+              "docling_ref": "#/texts/12",
+              "page": 5
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/19",
+              "page": 5
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:57+00:00",
+            "provider": "google_books",
+            "resource_id": "JpKuYv4_JMMC"
+          }
+        ],
+        "publisher": "Columbia University Press",
+        "title": "The Most Important Thing Illuminated"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "The_Most_Important_Thing_Illuminated_-_Howard_Marks.pdf",
+      "lookup": {
+        "authors": [
+          "Howard Marks"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780231530798",
+            "9780231162845"
+          ],
+          "issn": []
+        },
+        "title": "The Most Important Thing Illuminated"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Howard Marks"
+              ],
+              "candidate_id": "google_books:JpKuYv4_JMMC",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "023153079X"
+                ],
+                "isbn13": [
+                  "9780231530798"
+                ]
+              },
+              "language": "en",
+              "page_count": 245,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:57+00:00",
+                "provider": "google_books",
+                "resource_id": "JpKuYv4_JMMC"
+              },
+              "published_date": "2013-01-15",
+              "publisher": "Columbia University Press",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "Uncommon Sense for the Thoughtful Investor",
+              "title": "The Most Important Thing Illuminated",
+              "volume_id": "JpKuYv4_JMMC"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:57+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780231530798",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780231530798&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:JpKuYv4_JMMC",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:57+00:00",
+          "provider": "google_books",
+          "resource_id": "JpKuYv4_JMMC"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "b01fb4c9ce3e1d1c22d4d33f808a3263d2d71d936ad88cf531222d0cca56eb75",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:57+00:00",
+            "provider": "google_books",
+            "resource_id": "JpKuYv4_JMMC"
+          },
+          "value": "2013-01-15"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Hari P. Krishnan"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1119219019"
+          ],
+          "isbn13": [
+            "9781119219002",
+            "9781119219019",
+            "9781119219064"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                31,
+                49
+              ],
+              "docling_ref": "#/texts/306",
+              "page": 18
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                18
+              ],
+              "docling_ref": "#/texts/307",
+              "page": 18
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                26,
+                44
+              ],
+              "docling_ref": "#/texts/307",
+              "page": 18
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:59+00:00",
+            "provider": "google_books",
+            "resource_id": "D_8fDgAAQBAJ"
+          }
+        ],
+        "publisher": "John Wiley & Sons",
+        "title": "The Second Leg Down"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "the_second_leg_down_-_hari_p_krishnan.pdf",
+      "lookup": {
+        "authors": [
+          "hari p krishnan"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781119219019",
+            "9781119219002",
+            "9781119219064"
+          ],
+          "issn": []
+        },
+        "title": "the second leg down"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Hari P. Krishnan"
+              ],
+              "candidate_id": "google_books:D_8fDgAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1119219019"
+                ],
+                "isbn13": [
+                  "9781119219019"
+                ]
+              },
+              "language": "en",
+              "page_count": 212,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:11:59+00:00",
+                "provider": "google_books",
+                "resource_id": "D_8fDgAAQBAJ"
+              },
+              "published_date": "2017-02-13",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "Strategies for Profiting after a Market Sell-Off",
+              "title": "The Second Leg Down",
+              "volume_id": "D_8fDgAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:11:59+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781119219019",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781119219019&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:D_8fDgAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:11:59+00:00",
+          "provider": "google_books",
+          "resource_id": "D_8fDgAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "bc853e10d9abec73ff9308dd7c9bc689f9758e58780f69dd04a2349f24329f06",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:11:59+00:00",
+            "provider": "google_books",
+            "resource_id": "D_8fDgAAQBAJ"
+          },
+          "value": "2017-02-13"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780470564943",
+            "9780470892480",
+            "9780470892497",
+            "9780470892503"
+          ],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/25",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                24,
+                46
+              ],
+              "docling_ref": "#/texts/25",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/26",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                30,
+                52
+              ],
+              "docling_ref": "#/texts/26",
+              "page": 4
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "identité d'édition non résolue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "time-compression-trading-exploiting-multiple-time-frames-in-zero-sum-markets-wiley-trading.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780470564943",
+            "9780470892480",
+            "9780470892497",
+            "9780470892503"
+          ],
+          "issn": []
+        },
+        "title": "time-compression-trading-exploiting-multiple-time-frames-in-zero-sum-markets-wiley-trading"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Jason Alan Jankovsky"
+              ],
+              "candidate_id": "google_books:r9Z1NQEACAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0470564946"
+                ],
+                "isbn13": [
+                  "9780470564943"
+                ]
+              },
+              "language": "en",
+              "page_count": 192,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:12:00+00:00",
+                "provider": "google_books",
+                "resource_id": "r9Z1NQEACAAJ"
+              },
+              "published_date": "2010-10-05",
+              "publisher": "Wiley",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": "Exploiting Multiple Time Frames in Zero Sum Markets",
+              "title": "Time Compression Trading",
+              "volume_id": "r9Z1NQEACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:12:00+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780470564943",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780470564943&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "rejected"
+      },
+      "source_sha256": "0fd2c69a1a978b61bcab0c3deddbec06cf472fc9d200539f96896bec90d31718",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [
+            "0471592242",
+            "8004580939"
+          ],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                18
+              ],
+              "docling_ref": "#/texts/72",
+              "page": 5
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                62,
+                74
+              ],
+              "docling_ref": "#/texts/3680",
+              "page": 312
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "preuve textuelle locale",
+            "limites explicites de la revue"
+          ],
+          "level": "contextual"
+        },
+        "domains": [
+          "trading_practice",
+          "risk_management"
+        ],
+        "justification": "L'ouvrage documente des pratiques de trading et de gestion du risque ; son contexte ancien exige une validation contre les marchés actuels.",
+        "limitations": "Aucune correspondance fournisseur acceptée : l'identité commerciale, l'édition et la fraîcheur ne sont pas promues.",
+        "method": "lecture du texte local et de la page de titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [
+          "dated_context_requires_current_validation"
+        ],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "trading-for-a-living-psychology-trading-tactics-money-management.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "0471592242",
+            "8004580939"
+          ],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "trading-for-a-living-psychology-trading-tactics-money-management"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Alexander Elder"
+              ],
+              "candidate_id": "google_books:Rc7zDwAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0471592242"
+                ],
+                "isbn13": [
+                  "9780471592242"
+                ]
+              },
+              "language": "en",
+              "page_count": 311,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:12:01+00:00",
+                "provider": "google_books",
+                "resource_id": "Rc7zDwAAQBAJ"
+              },
+              "published_date": "1993-03-22",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": "Psychology, Trading Tactics, Money Management",
+              "title": "Trading for a Living",
+              "volume_id": "Rc7zDwAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:12:01+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:0471592242",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A0471592242&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "rejected"
+      },
+      "source_sha256": "11f9dc42c0495b58ddeece7e1f339c9a698b609264ffca13ff4f511979a70275",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [
+            "0071395784",
+            "0071370684"
+          ],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                13
+              ],
+              "docling_ref": "#/texts/7",
+              "page": 4
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                76,
+                89
+              ],
+              "docling_ref": "#/texts/8",
+              "page": 4
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "identité d'édition non résolue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "trading-on-momentum-advanced-techniques-for-high-percentage-day-trading.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "0071395784",
+            "0071370684"
+          ],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "trading-on-momentum-advanced-techniques-for-high-percentage-day-trading"
+      },
+      "provider_observations": [
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:12:02+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:0071395784",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A0071395784&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        },
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Ken Wolff"
+              ],
+              "candidate_id": "google_books:sp9ZAAAAYAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [],
+                "isbn13": []
+              },
+              "language": "en",
+              "page_count": 296,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:12:04+00:00",
+                "provider": "google_books",
+                "resource_id": "sp9ZAAAAYAAJ"
+              },
+              "published_date": "2002",
+              "publisher": "McGraw-Hill Companies",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": "Advanced Techniques for High-percentage Day Trading",
+              "title": "Trading on Momentum",
+              "volume_id": "sp9ZAAAAYAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:12:03+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:0071370684",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A0071370684&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        },
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Ken Wolff"
+              ],
+              "candidate_id": "google_books:sp9ZAAAAYAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [],
+                "isbn13": []
+              },
+              "language": "en",
+              "page_count": 296,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:12:04+00:00",
+                "provider": "google_books",
+                "resource_id": "sp9ZAAAAYAAJ"
+              },
+              "published_date": "2002",
+              "publisher": "McGraw-Hill Companies",
+              "rating": null,
+              "status": "rejected",
+              "subtitle": "Advanced Techniques for High-percentage Day Trading",
+              "title": "Trading on Momentum",
+              "volume_id": "sp9ZAAAAYAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:12:04+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:trading-on-momentum-advanced-techniques-for-high-percentage-day-trading",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3Atrading-on-momentum-advanced-techniques-for-high-percentage-day-trading&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "rejected"
+      },
+      "source_sha256": "b68e620f6f7b59ec2a35794f4c8040106b5bc92a31164aaad0bcb1435e457553",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Murray Gunn"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0470987855"
+          ],
+          "isbn13": [
+            "9780470987858"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/26",
+              "page": 5
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:12:05+00:00",
+            "provider": "google_books",
+            "resource_id": "SoFJuAAACAAJ"
+          }
+        ],
+        "publisher": "Wiley",
+        "title": "Trading Regime Analysis"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management",
+          "regime_analysis",
+          "trading_practice"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "trading-regime-analysis-the-probability-of-volatility-wiley-trading.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9780470987858"
+          ],
+          "issn": []
+        },
+        "title": "trading-regime-analysis-the-probability-of-volatility-wiley-trading"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Murray Gunn"
+              ],
+              "candidate_id": "google_books:SoFJuAAACAAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0470987855"
+                ],
+                "isbn13": [
+                  "9780470987858"
+                ]
+              },
+              "language": "en",
+              "page_count": 0,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:12:05+00:00",
+                "provider": "google_books",
+                "resource_id": "SoFJuAAACAAJ"
+              },
+              "published_date": "2009-03-02",
+              "publisher": "Wiley",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "The Probability of Volatility",
+              "title": "Trading Regime Analysis",
+              "volume_id": "SoFJuAAACAAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:12:05+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9780470987858",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780470987858&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:SoFJuAAACAAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:12:05+00:00",
+          "provider": "google_books",
+          "resource_id": "SoFJuAAACAAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "a7bae9c5fff794489a5496734a47e3a35fe793c0a27e1c1ae1018b17a22d911d",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:12:05+00:00",
+            "provider": "google_books",
+            "resource_id": "SoFJuAAACAAJ"
+          },
+          "value": "2009-03-02"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781452476988"
+          ],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                23
+              ],
+              "docling_ref": "#/texts/4",
+              "page": 1
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "aucun volume Google Books correspondant ; publication possiblement sans ISBN",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "two-roads-diverged-trading-divergences.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781452476988"
+          ],
+          "issn": []
+        },
+        "title": "two-roads-diverged-trading-divergences"
+      },
+      "provider_observations": [
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:12:06+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781452476988",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781452476988&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        },
+        {
+          "candidates": [],
+          "observed_at": "2026-08-07T15:12:06+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "title_author",
+            "query": "intitle:two-roads-diverged-trading-divergences",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=intitle%3Atwo-roads-diverged-trading-divergences&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "no_match"
+      },
+      "source_sha256": "b5f7e399ef9ede1ef301cad26a3800279d0c022e67daeb348425066ba61893e1",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [],
+        "identifiers": {
+          "isbn10": [
+            "0071382607",
+            "0071345566",
+            "3127864450",
+            "3129771042"
+          ],
+          "isbn13": [],
+          "issn": []
+        },
+        "language": null,
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                13
+              ],
+              "docling_ref": "#/texts/18",
+              "page": 5
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                76,
+                89
+              ],
+              "docling_ref": "#/texts/19",
+              "page": 5
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                102,
+                114
+              ],
+              "docling_ref": "#/texts/1608",
+              "page": 226
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                115,
+                126
+              ],
+              "docling_ref": "#/texts/1614",
+              "page": 227
+            }
+          }
+        ],
+        "publisher": null,
+        "title": null
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
+        "reason": "fournisseur indisponible ; aucune valeur externe promue",
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "not_assessable"
+      },
+      "file_name": "understanding-hedged-scale-trading.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "0071382607",
+            "0071345566",
+            "3127864450",
+            "3129771042"
+          ],
+          "isbn13": [],
+          "issn": []
+        },
+        "title": "understanding-hedged-scale-trading"
+      },
+      "provider_observations": [
+        {
+          "candidates": [],
+          "error": {
+            "code": "provider_unavailable",
+            "message": "Google Books indisponible : HTTP Error 503: Service Unavailable"
+          },
+          "observed_at": "2026-08-07T15:12:07+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:0071382607"
+          },
+          "status": "unavailable"
+        }
+      ],
+      "resolution": {
+        "candidate_id": null,
+        "proof": null,
+        "status": "unavailable"
+      },
+      "source_sha256": "1c7724b3b04d8f47dd66afdc46597402e80ffae8efca4cdf724ec4c1499ec09b",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": null,
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Alex Greyserman",
+          "Kathryn Kaminski"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "1118890973"
+          ],
+          "isbn13": [
+            "9781118890974",
+            "9781118891025",
+            "9781118891049"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                22
+              ],
+              "docling_ref": "#/texts/19",
+              "page": 6
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                35,
+                57
+              ],
+              "docling_ref": "#/texts/19",
+              "page": 6
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                65,
+                87
+              ],
+              "docling_ref": "#/texts/19",
+              "page": 6
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:12:08+00:00",
+            "provider": "google_books",
+            "resource_id": "3cBoBQAAQBAJ"
+          }
+        ],
+        "publisher": "John Wiley & Sons",
+        "title": "Trend Following with Managed Futures"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management",
+          "trend_following"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "vdoc.pub_trend-following-with-managed-futures-the-search-for-crisis-alpha.pdf",
+      "lookup": {
+        "authors": [],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [],
+          "isbn13": [
+            "9781118890974",
+            "9781118891049",
+            "9781118891025"
+          ],
+          "issn": []
+        },
+        "title": "vdoc trend-following-with-managed-futures-the-search-for-crisis-alpha"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Alex Greyserman",
+                "Kathryn Kaminski"
+              ],
+              "candidate_id": "google_books:3cBoBQAAQBAJ",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1118890973"
+                ],
+                "isbn13": [
+                  "9781118890974"
+                ]
+              },
+              "language": "en",
+              "page_count": 470,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:12:08+00:00",
+                "provider": "google_books",
+                "resource_id": "3cBoBQAAQBAJ"
+              },
+              "published_date": "2014-08-25",
+              "publisher": "John Wiley & Sons",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "The Search for Crisis Alpha",
+              "title": "Trend Following with Managed Futures",
+              "volume_id": "3cBoBQAAQBAJ"
+            }
+          ],
+          "observed_at": "2026-08-07T15:12:08+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781118890974",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781118890974&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:3cBoBQAAQBAJ",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:12:08+00:00",
+          "provider": "google_books",
+          "resource_id": "3cBoBQAAQBAJ"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "852846e02de0fa52742957be36866e8fcf29f5b14e3ef39115be3fe564f0515b",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:12:08+00:00",
+            "provider": "google_books",
+            "resource_id": "3cBoBQAAQBAJ"
+          },
+          "value": "2014-08-25"
+        },
+        "work_first_published": null
+      }
+    },
+    {
+      "bibliography": {
+        "authors": [
+          "Joel Greenblatt"
+        ],
+        "identifiers": {
+          "isbn10": [
+            "0684832135",
+            "0684840073",
+            "1451628064",
+            "2127773330"
+          ],
+          "isbn13": [
+            "9781451628067"
+          ],
+          "issn": []
+        },
+        "language": "en",
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                44,
+                62
+              ],
+              "docling_ref": "#/texts/13",
+              "page": 5
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                63,
+                81
+              ],
+              "docling_ref": "#/texts/13",
+              "page": 5
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                512,
+                524
+              ],
+              "docling_ref": "#/texts/777",
+              "page": 135
+            }
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                88,
+                115
+              ],
+              "docling_ref": "#/texts/13",
+              "page": 5
+            }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:12:09+00:00",
+            "provider": "google_books",
+            "resource_id": "5dQnKZR0h7wC"
+          }
+        ],
+        "publisher": "Simon and Schuster",
+        "title": "You Can Be a Stock Market Genius"
+      },
+      "commercial_observations": [],
+      "document_kind": "book",
+      "editorial_review": {
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "market_structure",
+          "portfolio_management"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
+        "reviewed_at": "2026-08-07",
+        "reviewer": "codex",
+        "status": "reviewed"
+      },
+      "file_name": "You_Can_Be_a_Stock_Market_Genius_-_Joel_Greenblatt.pdf",
+      "lookup": {
+        "authors": [
+          "Joel Greenblatt"
+        ],
+        "document_kind": "book",
+        "identifiers": {
+          "isbn10": [
+            "0684832135",
+            "0684840073",
+            "2127773330"
+          ],
+          "isbn13": [
+            "9781451628067"
+          ],
+          "issn": []
+        },
+        "title": "You Can Be a Stock Market Genius"
+      },
+      "provider_observations": [
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Joel Greenblatt"
+              ],
+              "candidate_id": "google_books:5dQnKZR0h7wC",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "1451628064"
+                ],
+                "isbn13": [
+                  "9781451628067"
+                ]
+              },
+              "language": "en",
+              "page_count": 304,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-07T15:12:09+00:00",
+                "provider": "google_books",
+                "resource_id": "5dQnKZR0h7wC"
+              },
+              "published_date": "2010-11-02",
+              "publisher": "Simon and Schuster",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": "Uncover the Secret Hiding Places of Stock Market P",
+              "title": "You Can Be a Stock Market Genius",
+              "volume_id": "5dQnKZR0h7wC"
+            }
+          ],
+          "observed_at": "2026-08-07T15:12:09+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:9781451628067",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9781451628067&maxResults=40&printType=books"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "resolution": {
+        "candidate_id": "google_books:5dQnKZR0h7wC",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-07T15:12:09+00:00",
+          "provider": "google_books",
+          "resource_id": "5dQnKZR0h7wC"
+        },
+        "status": "accepted"
+      },
+      "source_sha256": "bbb993ba14a288fed1d14163a082f1aa8333c626cfed1d6a2db55a6ed944f7c1",
+      "temporality": {
+        "content_revision": null,
+        "edition_published": {
+          "precision": "day",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-07T15:12:09+00:00",
+            "provider": "google_books",
+            "resource_id": "5dQnKZR0h7wC"
+          },
+          "value": "2010-11-02"
+        },
+        "work_first_published": null
+      }
+    }
+  ],
+  "generated_at": "2026-08-07T12:41:34+00:00",
+  "manifest_sha256": "9183a21ba320c4e7621771001ba1abbd5bcb5300ffd7629e85435915ec2f9378",
+  "schema_version": 1
+}

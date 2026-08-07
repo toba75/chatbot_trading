@@ -4,6 +4,9 @@ class MathQualification < ApplicationRecord
   CONTRACT_VERSION = "2.1"
   ANALYZER_VERSION = "0.8.0"
   CAPABILITY_PROFILE = "pdf-docling-semantic-correction-v3"
+  scope :for_kept_documents, -> { joins(conversion_attempt: :document).merge(Document.kept) }
+  default_scope { for_kept_documents }
+
   IDENTITY_FIELDS = %w[
     contract_version analyzer_version capability_profile source_sha256
     docling_document_sha256 input_fingerprint

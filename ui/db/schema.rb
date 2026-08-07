@@ -59,18 +59,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_07_212000) do
     t.datetime "started_at"
     t.string "status", null: false
     t.datetime "updated_at", null: false
-    t.index ["document_id"], name: "index_conversion_attempts_on_document_id"
     t.index ["docling_server_name"], name: "index_unreturned_docling_assignments_on_name", where: "(docling_server_returned_at IS NULL)"
     t.index ["docling_server_url"], name: "index_unreturned_docling_assignments_on_url", where: "(docling_server_returned_at IS NULL)"
+    t.index ["document_id"], name: "index_conversion_attempts_on_document_id"
     t.check_constraint "status::text <> 'converting'::text OR execution_job_id IS NOT NULL", name: "conversion_attempts_active_execution"
-    t.check_constraint "status::text = ANY (ARRAY['staging'::character varying, 'queued'::character varying, 'converting'::character varying, 'succeeded'::character varying, 'failed'::character varying]::text[])", name: "conversion_attempts_status"
+    t.check_constraint "status::text = ANY (ARRAY['staging'::character varying::text, 'queued'::character varying::text, 'converting'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text])", name: "conversion_attempts_status"
   end
 
   create_table "documents", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.datetime "deleted_at"
+    t.jsonb "metadata", default: {}, null: false
     t.bigint "retried_from_id"
     t.string "source_sha256", limit: 64, null: false
     t.datetime "updated_at", null: false
+    t.index ["deleted_at"], name: "index_documents_on_deleted_at"
     t.index ["retried_from_id"], name: "index_documents_on_retried_from_id"
     t.index ["source_sha256"], name: "index_documents_on_source_sha256", unique: true
   end
@@ -100,7 +103,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_07_212000) do
     t.check_constraint "completed_units <= total_units", name: "math_qualifications_progress"
     t.check_constraint "completed_units >= 0", name: "math_qualifications_completed_units"
     t.check_constraint "status::text <> 'running'::text OR execution_job_id IS NOT NULL", name: "math_qualifications_active_execution"
-    t.check_constraint "status::text = ANY (ARRAY['staging'::character varying, 'queued'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying]::text[])", name: "math_qualifications_status"
+    t.check_constraint "status::text = ANY (ARRAY['staging'::character varying::text, 'queued'::character varying::text, 'running'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text])", name: "math_qualifications_status"
     t.check_constraint "total_units >= 0", name: "math_qualifications_total_units"
   end
 

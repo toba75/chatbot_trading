@@ -1,0 +1,111 @@
+<% native_page_html_available = !!(@math_qualification&.succeeded? && @math_qualification.native_page_html.attached?) %>
+<% corrected_html_available = !!(
+  @math_qualification&.succeeded? && @math_qualification.current_contract? &&
+  @math_qualification.derived_html.attached?
+) %>
+<% original_html_path = native_page_html_available ? page_html_preview_document_path(@document) : html_preview_document_path(@document) %>
+<% original_html_synchronized = native_page_html_available %>
+<% html_formats = [
+  [ "HTML corrigé", "html-corrected", derived_html_preview_document_path(@document), "HTML corrigé", true, :html, corrected_html_available ],
+  [ "HTML original", "html-original", original_html_path, "HTML original", original_html_synchronized, :html, true ]
+] %>
+<% formats = html_formats + [
+  [ "Markdown", "markdown", markdown_preview_document_path(@document), "Conversion Markdown", false, :markdown, true ],
+  [ "JSON", "json", docling_page_preview_document_path(@document, page: 1), "Projection JSON de la page 1", false, :json, true ]
+] %>
+<% initial_format = corrected_html_available ? formats.first : formats.second %>
+<% initial_preview_path = initial_format[4] ? "#{initial_format[2]}#page-1" : initial_format[2] %>
+<% initial_preview_title = initial_format[4] ? "#{initial_format[3]} — page 1" : initial_format[3] %>
+
+<section
+  class="comparison"
+  aria-label="Comparaison du document"
+  data-controller="page-sync"
+  data-action="page-html:available@window->page-sync#useHtmlUrl panel-tabs:shown@window->page-sync#refresh"
+  data-page-sync-pdf-url-value="<%= rails_blob_path(@document.source_pdf, disposition: "inline") %>"
+  data-page-sync-html-url-value="<%= initial_format[2] %>"
+  data-page-sync-html-synchronized-value="<%= initial_format[4] %>"
+  data-page-sync-json-url-value="<%= docling_page_preview_document_path(@document) %>"
+  data-page-sync-page-count-value="<%= @attempt.page_count %>"
+  data-page-sync-worker-url-value="<%= asset_path("pdfjs/pdf.worker.min.js") %>"
+>
+  <article>
+    <h2>PDF original</h2>
+    <nav class="page-navigation" aria-label="Navigation dans le PDF original">
+      <button type="button" data-page-sync-target="previous" data-action="page-sync#previous" disabled>Précédente</button>
+      <label>
+        Page
+        <input
+          type="number"
+          min="1"
+          value="1"
+          inputmode="numeric"
+          data-page-sync-target="page"
+          data-action="change->page-sync#choosePage keydown.enter->page-sync#choosePage"
+        >
+        / <span data-page-sync-target="total"><%= @attempt.page_count %></span>
+      </label>
+      <button type="button" data-page-sync-target="next" data-action="page-sync#next">Suivante</button>
+    </nav>
+    <div class="pdf-page-viewer" data-page-sync-target="viewer">
+      <p data-page-sync-target="status">Chargement du PDF…</p>
+      <canvas title="Page courante du PDF original" data-page-sync-target="canvas"></canvas>
+    </div>
+  </article>
+
+  <article data-controller="format-tabs">
+    <h2>Conversion Docling</h2>
+    <% preview_id = "docling-preview-#{@document.id}" %>
+    <% preview_name = "docling_preview_#{@document.id}" %>
+    <nav class="format-tabs" role="tablist" aria-label="Formats Docling">
+      <% formats.each do |label, key, path, title, synchronized, kind, available| %>
+        <% tab_id = "#{preview_id}-#{key}" %>
+        <% selected = key == initial_format[1] %>
+        <%= link_to label, path,
+          id: tab_id,
+          class: class_names("format-tab", active: selected),
+          role: "tab",
+          target: preview_name,
+          hidden: !available,
+          tabindex: selected ? 0 : -1,
+          aria: { controls: preview_id, selected: selected },
+          data: {
+            format_tabs_target: "tab",
+            page_sync_target: if key == "html-corrected"
+              "htmlTab correctedHtmlTab"
+            elsif key == "html-original"
+              "htmlTab originalHtmlTab"
+            elsif kind == :json
+              "jsonTab"
+            end,
+            page_sync_base_url: kind == :html ? path : nil,
+            page_sync_synchronized: kind == :html ? synchronized : nil,
+            page_sync_title: kind == :html ? title : nil,
+            action: class_names(
+              "click->format-tabs#select keydown->format-tabs#navigate",
+              "click->page-sync#selectHtml" => kind == :html,
+              "click->page-sync#selectJson" => kind == :json
+            ),
+            preview_title: title
+          } %>
+      <% end %>
+    </nav>
+    <p class="html-sync-notice" data-page-sync-target="htmlSyncNotice" <%= "hidden" if native_page_html_available %>>
+      La synchronisation HTML par page sera disponible après une qualification mathématique réussie.
+    </p>
+    <iframe
+      id="<%= preview_id %>"
+      name="<%= preview_name %>"
+      title="<%= initial_preview_title %>"
+      role="tabpanel"
+      aria-labelledby="<%= preview_id %>-<%= initial_format[1] %>"
+      sandbox=""
+      data-format-tabs-target="preview"
+      data-page-sync-target="doclingPreview"
+      src="<%= initial_preview_path %>"></iframe>
+    <p class="canonical-download">
+      <%= link_to "Télécharger le JSON canonique complet",
+        rails_blob_path(@attempt.docling_document, disposition: "attachment") %>
+    </p>
+  </article>
+</section>

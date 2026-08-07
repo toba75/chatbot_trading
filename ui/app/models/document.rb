@@ -1,8 +1,13 @@
 require "digest"
 
 class Document < ApplicationRecord
+  include Discard::Model
+
   class InvalidPdf < StandardError; end
   class NotRetryable < StandardError; end
+
+  self.discard_column = :deleted_at
+  default_scope { kept }
 
   PROCESSING_STATUS_LABELS = {
     "conversion_staging" => "Préparation",
@@ -22,10 +27,33 @@ class Document < ApplicationRecord
   ].freeze
 
   has_one_attached :source_pdf
-  has_many :conversion_attempts, -> { order(:id) }, inverse_of: :document
+  has_many :conversion_attempts, -> { for_kept_documents.order(:id) }, inverse_of: :document
   belongs_to :retried_from, class_name: "Document", optional: true
 
+  after_update_commit :broadcast_document_index_refresh, if: :saved_change_to_deleted_at?
+
+  scope :discarded, -> { with_discarded.where.not(discard_column => nil) }
+  scope :with_deleted, -> { with_discarded }
+
   validates :source_sha256, length: { is: 64 }, uniqueness: true
+
+  def bibliographic_metadata
+    metadata.fetch("bibliography", {})
+  end
+
+  def metadata_enrichment
+    metadata.fetch("enrichment", {})
+  end
+
+  alias deleted? discarded?
+
+  def conversion_attempts
+    if persisted? && !self.class.kept.where(id: id).exists?
+      association(:conversion_attempts).reset
+    end
+
+    association(:conversion_attempts).reader
+  end
 
   def current_attempt
     conversion_attempts.last || raise(ActiveRecord::RecordNotFound, "Ce document ne possède aucune tentative.")
@@ -104,6 +132,10 @@ class Document < ApplicationRecord
   private_class_method :validate_pdf!
 
   private
+
+  def broadcast_document_index_refresh
+    broadcast_refresh_later_to("documents")
+  end
 
   def qualification_status_key(qualification)
     return "qualification_missing" unless qualification

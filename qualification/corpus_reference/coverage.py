@@ -32,7 +32,7 @@ from qualification.math_audit.capture import _get_json, _post_json, request_payl
 
 ENDPOINT = "http://127.0.0.1:5001"
 WORK = Path(__file__).resolve().parent / "work"
-COVERAGE = CORPUS / "coverage.json"
+COVERAGE = CORPUS.parent / "corpus_coverage" / "coverage.json"
 
 _CONVERSION_TIMEOUT = 86_400
 
