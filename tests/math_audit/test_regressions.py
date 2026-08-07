@@ -13,7 +13,7 @@ from pypdf.generic import (
 )
 
 from pdf_math_audit.analyzer import analyze_pdf
-from pdf_math_audit.fonts import LoadedFont, font_encoding, parse_to_unicode
+from pdf_math_audit.fonts import LoadedFont, font_encoding, load_font, parse_to_unicode
 from pdf_math_audit.limitations import AnalysisLimitation
 from pdf_math_audit.trace import (
     _font_resource_key,
@@ -562,3 +562,67 @@ def test_image_inline_melee_au_texte_est_hors_capacite(tmp_path: Path) -> None:
             "message": "Opérateurs non supportés: INLINE IMAGE",
         }
     ]
+
+
+def _type1c_font(cff_bytes: bytes) -> DictionaryObject:
+    font_file = DecodedStreamObject()
+    font_file.set_data(cff_bytes)
+    font_file[NameObject("/Subtype")] = NameObject("/Type1C")
+    descriptor = DictionaryObject({NameObject("/FontFile3"): font_file})
+    return DictionaryObject(
+        {
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Corrompue"),
+            NameObject("/FontDescriptor"): descriptor,
+        }
+    )
+
+
+class _Reference:
+    idnum = 7
+
+    def __init__(self, font: DictionaryObject) -> None:
+        self._font = font
+
+    def get_object(self) -> DictionaryObject:
+        return self._font
+
+
+def test_une_police_embarquee_illisible_exclut_sa_ressource_sans_abattre_l_analyse() -> None:
+    """fontTools échoue sur des octets CFF corrompus : la limite reste locale."""
+    reference = _Reference(_type1c_font(b"ces octets ne sont pas du CFF"))
+
+    with pytest.raises(AnalysisLimitation) as limite:
+        load_font("/F1", reference)
+
+    assert limite.value.code == "embedded_font_not_interpretable"
+    assert limite.value.status == "unsupported"
+    assert "/F1" in str(limite.value)
+
+
+def test_une_defaillance_hors_du_decodeur_de_polices_reste_une_erreur() -> None:
+    """Un bug de notre code ne doit pas être maquillé en limite de police."""
+
+    class _Casse:
+        idnum = 7
+
+        def get_object(self):
+            raise ZeroDivisionError("bug interne")
+
+    with pytest.raises(ZeroDivisionError):
+        load_font("/F1", _Casse())
+
+
+def test_un_bug_interne_au_chargement_n_est_pas_converti_en_limite(monkeypatch) -> None:
+    """Le discriminant exige une frame fontTools : un échec de notre propre code
+    survenant au même endroit du chargement doit continuer de remonter."""
+
+    class _DecodeurSaboté:
+        def decompile(self, *arguments):
+            raise ZeroDivisionError("bug interne sans frame fontTools")
+
+    monkeypatch.setattr("pdf_math_audit.fonts.CFFFontSet", _DecodeurSaboté)
+    reference = _Reference(_type1c_font(b"peu importe"))
+
+    with pytest.raises(ZeroDivisionError):
+        load_font("/F1", reference)

@@ -13,19 +13,175 @@ La tranche est terminée uniquement lorsque les sept lignes ci-dessous portent
 le statut **terminé** avec la preuve indiquée. Une étape « presque finie », des
 tests verts ou une démonstration ponctuelle ne suffisent pas.
 
-Les étapes 1 → 2 → 3 sont séquentielles. Les étapes 4 et 5 dépendent du contrat
-de l'étape 3. L'étape 6 est indépendante et peut avancer en parallèle. L'étape 7
-dépend de l'étape 3.
+Les étapes 1 → 2 → 3 sont séquentielles. Les sous-étapes 3.0 à 3.5 du plan des
+métadonnées ci-dessous font partie de l'étape 3 : cette étape ne peut pas être
+déclarée terminée tant qu'elles ne le sont pas. Les étapes 4 et 5 dépendent du
+contrat de l'étape 3. L'étape 6 est indépendante et peut avancer en parallèle.
+L'étape 7 dépend de l'étape 3 et ses sous-étapes 7.1 et 7.2 qualifient séparément
+chaque signal de classement.
 
 | Étape | Prescription | Condition de complétude | Statut |
 |---|---|---|---|
 | 1 | Assainir et geler le corpus de référence. Purger les artefacts AppleDouble (`._*`, `.__*`), trancher le doublon exact (`document.pdf` = `short-term-trading-strategies-that-work-.pdf`) et les deux paires quasi-doublons (« high frequency trading », « trading-on-momentum »), classer chaque PDF (texte ou scan), acter le sort des quatre livres scannés (voie OCR ou exclusion motivée) et le mode de conservation du corpus (LFS ou hors dépôt). | Un manifeste committé (`docs/corpus_reference/manifest.json`) couvre 100 % des fichiers du répertoire : SHA-256, pages, classe texte/scan, décision et motif pour chaque exclusion. Un script rejouable vérifie que le répertoire et le manifeste coïncident exactement — aucun fichier hors manifeste, aucune entrée sans fichier. Les quatre scans portent une décision explicite ; aucune ne repose sur un OCR non encore réalisé. | terminé |
-| 2 | Mesurer la couverture réelle. Convertir puis qualifier chaque PDF textuel du manifeste en mode audit (sans correction Gemma), et agréger par livre : régions, verdicts, codes de refus, pages exclues, durées. | Un rapport de couverture committé donne l'histogramme des codes de refus par livre et agrégé, le nombre de régions par verdict, et chiffre le gain potentiel des trois causes de non-vérifiabilité dominantes. Chaque livre du manifeste y figure : qualifié, ou échec d'exécution avec le constat exact — un crash du pipeline sur un PDF sauvage est un résultat documenté, jamais une exclusion silencieuse. Aucun oracle n'est requis à cette étape. | à faire |
-| 3 | Définir et implémenter le contrat de l'index RAG. Un export de chunks depuis les artefacts de qualification : texte avec LaTeX inline, drapeau par formule (`proven`, `corroborated`, `unverified`, `contradicted`), provenance de citation (document, page, bbox) permettant de produire le crop source, identité et version du contrat. | Le schéma est versionné et documenté. L'exporteur est testé : un chunk dont une formule n'a ni drapeau ni provenance est refusé (contre-exemple en test). L'export réel d'au moins cinq livres du corpus existe avec comptages par drapeau. Aucun drapeau ne surclasse la preuve : `proven` exige le verdict du pipeline, `corroborated` exige l'accord d'un second modèle indépendant mesuré par l'étape 6, jamais une heuristique. | à faire |
+| 2 | Mesurer la couverture réelle. Convertir puis qualifier chaque PDF textuel du manifeste en mode audit (sans correction Gemma), et agréger par livre : régions, verdicts, codes de refus, pages exclues, durées. | Un rapport de couverture committé donne l'histogramme des codes de refus par livre et agrégé, le nombre de régions par verdict, et chiffre le gain potentiel des trois causes de non-vérifiabilité dominantes. Chaque livre du manifeste y figure : qualifié, ou échec d'exécution avec le constat exact — un crash du pipeline sur un PDF sauvage est un résultat documenté, jamais une exclusion silencieuse. Aucun oracle n'est requis à cette étape. | terminé |
+| 3 | Définir et implémenter le contrat de l'index RAG. Un export de chunks depuis les artefacts de qualification : texte avec LaTeX inline, drapeau par formule (`proven`, `corroborated`, `unverified`, `contradicted`), provenance de citation (document, page, bbox) permettant de produire le crop source, identité et version du contrat. Le contrat transporte aussi la projection bibliographique, temporelle et éditoriale définie par le sous-plan ci-dessous. | Le schéma est versionné et documenté. L'exporteur est testé : un chunk dont une formule n'a ni drapeau ni provenance est refusé (contre-exemple en test). L'export réel d'au moins cinq livres du corpus existe avec comptages par drapeau. Le registre de sources couvre les 38 documents retenus, y compris les états ambigus ou non résolus, et chaque champ projeté est traçable. Aucun drapeau, fournisseur externe ni signal éditorial ne surclasse la preuve : `proven` exige le verdict du pipeline, `corroborated` exige l'accord d'un second modèle indépendant mesuré par l'étape 6, jamais une heuristique. | à faire |
 | 4 | Étendre la vérification aux tableaux. Chaque cellule numérique d'un tableau Docling est confrontée aux glyphes PDF de sa zone par la machinerie de preuve existante ; les cellules reçoivent des verdicts au même contrat que les formules, avec raison explicite quand la vérification est impossible. | La mesure porte sur un échantillon d'au moins vingt tableaux réels issus d'au moins cinq livres distincts, avec taux de cellules vérifiées publié. Un contre-exemple synthétique — un tableau dont une cellule est altérée après conversion — est détecté. Les tableaux non vérifiables portent une raison localisée, pas un silence. | à faire |
 | 5 | Acter la politique des graphiques. Décider entre l'exclusion avec marqueur de présence et la description générée par VLM ; dans les deux cas, aucun texte généré ne se présente comme contenu source. Implémenter la politique dans l'export de chunks. | La politique est écrite dans ce dossier. L'export marque chaque figure conformément ; un test vérifie qu'une description générée porte son origine (`generated`) et qu'aucun chunk ne la présente comme texte du document. | à faire |
 | 6 | Construire les scorecards des composants stochastiques. Un banc rejouable par modèle sur cibles épinglées : granite-docling (taux de jetons exacts par formule contre les oracles existants), Gemma (taux d'acceptation prouvée sur un jeu de cibles épinglé), Nougat (généralisation du harnais shadow existant). Résultats datés, versionnés, conservés en série temporelle. | Chaque banc s'exécute par une commande unique et dépose un résultat daté portant la révision exacte du modèle mesuré. Une ligne de base est enregistrée pour les versions actuelles des trois modèles. Un changement de révision de modèle sans nouvelle mesure est détecté — le banc ou la qualification le signale explicitement. Les seuils binaires à 1.0 restent réservés aux invariants du code déterministe ; les modèles se suivent en courbes, pas en portes. | à faire |
-| 7 | Construire les evals de récupération. Un jeu d'au moins cinquante questions de trading, chacune liée aux passages sources attendus (livre, page) dans le corpus gelé. Un harnais mesure la récupération (hit@k) sur l'index issu de l'étape 3. Les evals de qualité de réponse restent hors de cette tranche tant que le chatbot n'existe pas. | Les questions et leurs passages attendus sont committés. Le harnais est rejouable par une commande et publie hit@k. Une ligne de base est mesurée sur l'index réel. La limite de périmètre (pas d'eval de réponses sans chatbot) est écrite, pas implicite. | à faire |
+| 7 | Construire les evals de récupération. Un jeu d'au moins cinquante questions de trading, chacune liée aux passages sources attendus (livre, page) dans le corpus gelé. Les jugements nomment tous les passages acceptables et leur pertinence graduée lorsqu'un ordre de préférence est attendu. Un harnais mesure la récupération sur l'index issu de l'étape 3. Le jeu couvre explicitement les questions intemporelles, sensibles à la date, exigeant une source actuelle, les sources avec ou sans ISBN, et les ouvrages peu populaires mais pertinents. Les evals de qualité de réponse restent hors de cette tranche tant que le chatbot n'existe pas. | Les questions et leurs passages attendus sont committés. Le harnais est rejouable par une commande et publie hit@k, MRR et nDCG@k, globalement et par strate. Une ligne de base lexicale et dense est mesurée sans autorité, fraîcheur ni popularité ; chaque signal est ensuite ajouté isolément et conservé seulement s'il améliore les strates visées sans dégrader les autres. L'absence de métadonnée vaut `unknown`, jamais zéro. La limite de périmètre (pas d'eval de réponses sans chatbot) est écrite, pas implicite. | à faire |
+
+## Sous-plan des étapes 3 et 7 — métadonnées et valeur des sources
+
+### Responsabilité et frontières
+
+Le manifeste `docs/corpus_reference/manifest.json` reste le registre mécanique
+de l'identité des fichiers, de leur couche de texte et de leur inclusion. Il
+n'accueille aucune métadonnée bibliographique ou commerciale : son générateur
+reconstruit exactement ses champs, et le répertoire `docs/corpus_reference/`
+refuse tout fichier étranger hormis le manifeste et les PDF.
+
+Un registre de sources distinct, prévu sous `docs/source_catalog/`, porte les
+revendications bibliographiques, temporelles et éditoriales. Chaque entrée est
+reliée à `source_sha256`. Elle ne modifie ni le PDF ni le `DoclingDocument` et
+devient une entrée reproductible de la projection de chunks.
+
+L'implémentation prévue est un petit module Python sous
+`qualification/source_catalog/`, accompagné de ses tests ciblés sous
+`tests/source_catalog/`. Il réutilise d'abord la bibliothèque standard pour le
+JSON, les empreintes et les appels HTTP ; aucune dépendance n'est ajoutée tant
+qu'un besoin réel ne l'impose. Deux commandes explicites sont attendues :
+
+- `enrich` propose des correspondances de fournisseur sans les promouvoir
+  silencieusement ;
+- `verify` confronte le registre, le manifeste et les preuves de correspondance,
+  puis échoue sur toute dérive, identité absente ou valeur acceptée sans preuve.
+
+### Contrat du registre
+
+Le schéma versionné distingue quatre familles qui ne sont jamais aplaties dans
+une note globale :
+
+1. **Identité bibliographique** : titre d'affichage, auteurs, langue, éditeur,
+   type de publication, ISBN/ISSN/autres identifiants et identifiants des
+   fournisseurs. `source_sha256` reste l'identité du fichier et de ses
+   citations. Les relations optionnelles `work → edition → source_asset` ne
+   sont acceptées qu'après revue ; un ISBN désigne une édition candidate, jamais
+   le PDF lui-même. Les valeurs inconnues restent nulles.
+2. **Temporalité** : date de publication originale, date de l'édition du
+   fichier et date de révision du contenu lorsqu'elle est prouvée. Une
+   réimpression récente ne devient pas une révision récente.
+3. **Appréciation éditoriale** : domaines dans lesquels la source ou l'auteur
+   est pertinent, nature de la méthode, présence de preuves ou de références,
+   limites observées, justification, auteur et date de la revue. Il n'existe ni
+   `authority_score` global ni autorité d'un auteur valable pour tous les sujets.
+4. **Observations commerciales** : fournisseur, identifiant, marché, catégorie,
+   note moyenne, nombre de notes, rang et instant d'observation. Une note sans
+   nombre de votes et un rang sans marché, catégorie et date sont invalides.
+
+Chaque consultation externe porte son fournisseur, son identifiant de ressource,
+la requête ou l'identifiant utilisé, l'instant de lecture et, lorsque le contrat
+du fournisseur l'impose, son expiration. L'état de consultation distingue
+`not_queried`, `succeeded`, `no_match`, `unavailable` et `expired`. L'état de
+chaque candidat distingue séparément `candidate`, `accepted`, `ambiguous` et
+`rejected`. Une correspondance par ISBN lu dans le contenu source peut être
+acceptée après contrôles de cohérence ; plusieurs ISBN dans un même PDF restent
+des candidats d'édition distincts. Une correspondance par titre et auteur reste
+candidate jusqu'à revue. La propriété PDF et le nom de fichier ne peuvent jamais
+suffire seuls.
+
+Le registre conserve la preuve utilisée pour accepter une valeur : localisation
+dans le PDF lorsque l'information y figure, ou référence précise du fournisseur
+externe. Une réponse externe brute n'est conservée que si les conditions du
+fournisseur l'autorisent ; sinon la donnée ne peut pas devenir une autorité
+durable et cette limite est observable dans l'entrée.
+
+### Fournisseurs autorisés dans cette tranche
+
+Google Books est le seul enrichissement réseau prévu initialement. La résolution
+essaie dans l'ordre : identifiant ISBN/ISSN issu du contenu, puis titre et auteur.
+Elle conserve tous les candidats plausibles et ne choisit jamais le premier
+résultat par défaut. Le bilan sépare les correspondances exactes, acceptées après
+revue, ambiguës, absentes et les documents sans identifiant de livre, notamment
+les articles et working papers. Avant toute donnée committée, le contrat de
+persistance documente les champs conservés, les conditions Google Books alors
+applicables et la procédure de retrait d'un contenu fourni par l'API. Une valeur
+qui ne peut pas être conservée selon ces conditions reste une observation non
+persistée et ne peut pas devenir une autorité du registre.
+
+Amazon n'est pas une dépendance de cette tranche. Au 7 août 2026, la Creators
+API est liée au programme d'affiliation et à des ventes référées ; ses règles de
+cache limitent `BrowseNodeInfo` à une heure et les informations produit à un
+jour. Elle expose des rangs de vente par marché et catégorie, parfois absents,
+mais ne documente pas comme ressource par ouvrage le couple note moyenne/nombre
+de notes nécessaire à une pondération fiable. Un adaptateur Amazon ne sera
+planifié qu'après une preuve distincte d'accès durable, de droit de conservation
+et de disponibilité des champs, puis une mesure de son apport. Aucun scraping de
+page produit ne remplace cette preuve.
+
+Références vérifiées pour l'implémentation :
+
+- [Google Books — ressource Volume](https://developers.google.com/books/docs/v1/reference/volumes) ;
+- [Google Books — recherche par ISBN, titre ou auteur](https://developers.google.com/books/docs/v1/using) ;
+- [Google Books — conditions d'utilisation](https://developers.google.com/books/terms) ;
+- [Amazon Creators API — accès et limites](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/concepts/api-rates) ;
+- [Amazon Creators API — cache](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/concepts/best-programming-practices) ;
+- [Amazon Creators API — rangs de vente](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/api-reference/resources/browse-node-info).
+
+### Ordre d'implémentation
+
+| Sous-étape | Travail | Preuve de complétude | Statut |
+|---|---|---|---|
+| 3.0 | Rétablir la frontière du corpus avant l'enrichissement : déplacer `coverage.json`, `coverage-sample.json` et `coverage-report.md` hors de `docs/corpus_reference/`, puis mettre à jour leur producteur, leurs tests et leurs références. | `uv run python -m qualification.corpus_reference.manifest verify` rend zéro écart avec les rapports présents à leur nouvel emplacement ; aucun artefact documentaire n'est ajouté à l'exception du manifeste dans le répertoire des PDF. | à faire |
+| 3.1 | Publier le schéma versionné du registre, ses états, ses règles de provenance, la politique de persistance des fournisseurs et le validateur local. | Des contre-exemples prouvent le refus d'un champ accepté sans preuve, d'une note sans nombre de votes, d'un rang sans contexte et d'une date d'édition confondue avec une date de révision. Le manifeste reste inchangé et vérifiable. La politique Google Books nomme les champs conservés et la procédure de retrait. | à faire |
+| 3.2 | Implémenter le résolveur Google Books et sa commande `enrich`, avec configuration explicite de l'accès réseau, délais bornés et erreurs observables. | Les tests unitaires couvrent ISBN exact, recherche titre/auteur ambiguë, volume absent, réponse invalide et fournisseur indisponible. Un test réseau simulé prouve seulement le contrat local ; la preuve de frontière appelle l'API réelle sur un document autorisé. | à faire |
+| 3.3 | Enrichir les 38 documents retenus et revoir manuellement les candidats non exacts. | Un rapport réel donne les comptes de consultations `succeeded`, `no_match` et `unavailable`, puis de candidats `accepted`, `ambiguous` et `rejected`. Il distingue livres, publications sans ISBN et PDF contenant plusieurs ISBN, et relie chaque acceptation à sa preuve. Aucun document ne disparaît parce que le fournisseur ne le connaît pas. | à faire |
+| 3.4 | Réaliser l'appréciation éditoriale et temporelle minimale du corpus. | Les 38 documents portent soit une revue datée avec domaines, justification et limites, soit `not_assessable` avec une raison précise ; aucun ne reste `unreviewed`. Les trois dates sont distinctes et nullables. Un échantillon contradictoire couvre un classique ancien encore pertinent, une information ancienne devenue obsolète et une source méconnue pertinente. | à faire |
+| 3.5 | Projeter dans les chunks uniquement les champs stables nécessaires au filtrage, à l'affichage et à l'évaluation. | La projection est reconstruite depuis le PDF, le `DoclingDocument` et le registre. La copie dans l'index conserve `source_sha256`, les références de provenance et la version du registre. Aucun signal commercial n'entre dans le texte dense ni ne modifie le statut de preuve. | à faire |
+| 7.1 | Sélectionner, figer et construire la ligne de base de récupération lexicale+dense sans a priori de source. | Un contrat de run porte la révision du code exécuté et les empreintes du manifeste, du registre, de l'export de chunks, de l'index et du jeu de questions avec ses jugements. Il épingle aussi la révision de l'encodeur dense, l'analyseur lexical, le moteur et sa version, les paramètres d'index, les valeurs de `k`, la normalisation et la règle de fusion. Toute nouvelle dépendance est justifiée par un essai ciblé. Tous les documents inclus peuvent produire des candidats ; la popularité absente n'est ni zéro ni exclusion. Les scores et rangs des deux voies, puis leur fusion, restent observables séparément. | à faire |
+| 7.2 | Évaluer séparément l'adéquation temporelle, l'autorité de domaine, puis une éventuelle popularité Google Books. | Une ablation appariée avant/après est publiée pour chaque signal sur les strates de l'étape 7, avec intervalles d'incertitude et protocole figé avant le run. La pertinence du passage reste dominante ; aucun signal n'est activé sans satisfaire les seuils ci-dessous et sans contre-exemple montrant qu'une pépite reste récupérable. | à faire |
+
+### Protocole d'évaluation des signaux
+
+Chaque strate utilisée pour autoriser un signal contient au moins dix questions
+jugées. Les questions peuvent porter plusieurs étiquettes, mais les effectifs et
+leurs intersections sont publiés : `timeless`, `time_sensitive`,
+`current_source_required`, `with_identifier`, `without_identifier`, `popular`
+et `little_known`. Un résultat sur une strate plus petite reste exploratoire et
+ne peut pas activer le signal.
+
+La métrique principale de classement est nDCG@10 ; hit@10 mesure la couverture
+et MRR la position du premier passage pertinent. Avant chaque ablation, le
+protocole fige l'effet minimal attendu et la régression maximale admise. Les
+valeurs initiales sont un gain d'au moins 0,02 nDCG@10 sur les strates ciblées,
+aucune baisse de hit@10 et au plus 0,01 de baisse nDCG@10 sur chaque strate non
+ciblée. Le rapport publie aussi l'intervalle de confiance à 95 % du delta par
+rééchantillonnage apparié. Si l'effectif ou l'incertitude ne permet pas de
+conclure, le signal reste désactivé au lieu d'être qualifié par intuition.
+
+### Politique de récupération
+
+La génération de candidats est toujours l'union des voies lexicale et dense,
+sans filtre d'autorité, d'âge ou de popularité. Les filtres durs sont réservés
+aux contraintes explicites de la question et aux champs fiables, par exemple la
+langue ou une période demandée.
+
+Le reclassement distingue la pertinence du passage, la qualité de sa preuve,
+l'adéquation temporelle à la question et l'autorité dans le domaine demandé.
+Une popularité évaluée ultérieurement reste un signal faible et ne compense
+jamais une faible pertinence. L'absence de fournisseur vaut `unknown` et conserve
+le candidat à égalité sur ce signal.
+
+La fraîcheur dépend de l'intention : une question intemporelle n'applique aucune
+décote automatique ; une question de microstructure, réglementation, coûts ou
+technologie peut privilégier une révision récente ; une question explicitement
+actuelle ne peut pas être satisfaite par le seul corpus de livres et doit rendre
+cette insuffisance observable.
+
+Une diversification par source et par auteur est évaluée comme stratégie de
+classement avant toute activation. Une source méconnue peut être présentée sur
+la seule force d'un passage pertinent et prouvé ; son manque de popularité ne
+déclenche ni décote ni demande de corroboration. Seuls la faiblesse de la preuve
+ou un statut éditorial non revu peuvent justifier une corroboration indépendante.
 
 ## Contraintes invariantes
 
@@ -45,6 +201,14 @@ dépend de l'étape 3.
 - L'axe HTML/MathML existant reste maintenu en l'état ; tout investissement
   nouveau sur cet axe doit être justifié par un besoin de l'index RAG, pas par
   la complétude du visualiseur.
+- Une métadonnée externe ne modifie jamais l'identité du PDF, sa décision
+  d'inclusion ni l'autorité du contenu source. Une divergence reste visible.
+- Il n'existe aucune décote universelle liée à l'âge, aucun score global
+  d'autorité et aucun filtre de popularité. Ces signaux dépendent de la question
+  et restent désactivés tant que les evals ne prouvent pas leur apport.
+- L'absence d'un fournisseur ou d'une métadonnée est un état explicite. Elle ne
+  vaut ni zéro, ni faible qualité, ni autorisation de choisir une autre valeur
+  sans le signaler.
 
 ## Preuves à reporter avant clôture
 
@@ -54,9 +218,13 @@ dépend de l'étape 3.
   agrégé et l'histogramme des refus qui fonde la feuille de route de
   généralisation ;
 - le schéma du contrat de chunks, l'export réel et ses comptages par drapeau ;
+- le registre versionné des sources, le rapport de résolution des 38 documents
+  et les preuves de revue des correspondances non exactes ;
 - les résultats de base des trois bancs avec les révisions exactes des modèles
   mesurés ;
-- la ligne de base hit@k des evals de récupération ;
+- la ligne de base hit@k, MRR et nDCG@k des evals de récupération et les
+  ablations séparées de l'adéquation temporelle, de l'autorité de domaine et de
+  toute popularité candidate ;
 - le résultat de la revue contradictoire portant explicitement sur l'adhérence
   aux sept étapes et aux contraintes invariantes.
 
@@ -105,6 +273,36 @@ dépend de l'étape 3.
   non-PDF invisibles, seuils de classification non épinglés (12 mutations sur 14
   survivaient), test de sérialisation ne testant ni tri ni indentation,
   dépendance au répertoire courant.
+
+- Étape 2 : les 38 documents retenus sont mesurés — 37 qualifiés, et un échec
+  d'exécution documenté avec son constat exact : « Pipeline VlmPipeline failed »
+  de docling-serve à l'assemblage, après conversion complète des 365 pages,
+  reproduit cinq fois sur les deux convertisseurs (l'API traduit ce crash en
+  404, ce qui avait d'abord masqué la cause). Le rapport committé comprend `coverage.json` (agrégat rejouable,
+  histogrammes et partition par famille de levier via `lever_partition`),
+  `coverage-report.md` (chiffrage) et `coverage-sample.json` (échantillon
+  audité de 90 régions, rejouable depuis ses coordonnées).
+- Chiffrage des leviers : preuve PDF seule 2 525 régions (93 % de vraies
+  mathématiques sur échantillon, gain 1 800–2 350) ; transcription Docling
+  seule 1 003 régions (47 %, gain ≈ 470, cible du témoin Nougat) ; mixtes
+  1 306 (gain ≈ 610 conditionné aux deux leviers). Le support des polices est
+  le levier dominant et fonde la tranche suivante de généralisation.
+- Pendant la mesure, un défaut majeur de la revue d'août a été corrigé sur
+  preuve réelle : les exceptions fontTools font désormais une exclusion
+  localisée (`embedded_font_not_interpretable`) au lieu d'abattre la
+  qualification — trois livres (768 pages) récupérés, mutation testée.
+- Deux corrections des seuils de promotion de polices ont été tentées puis
+  réfutées : l'une par l'oracle du gate (rappel 0,774 < 1,0), l'autre par
+  contrôle visuel (48 régions conformes détruites sur le document 22 — α, ε,
+  ζ, β et équations complètes). Le finding est consigné avec son ampleur
+  mesurée (≈ 1 300 fausses régions, ~15 % du total, hétérogènes) ; sa
+  correction exige un refactor de portée, hors de cette tranche.
+- La mesure a été distribuée sur deux convertisseurs à pile identique
+  (garde `require_identical_versions`, noyau hôte exclu de la comparaison) ;
+  configuration retenue après mesure : 1 worker et 12 CPU par machine, le
+  parallélisme intra-GPU ayant été mesuré contre-productif. Une panne d'un
+  convertisseur remet le livre en file (`ConverterUnreachable`) au lieu de le
+  condamner — défaut découvert par un redémarrage réel, corrigé et testé.
 
 ## Limites connues
 

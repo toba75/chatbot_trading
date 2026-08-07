@@ -12,7 +12,7 @@ from fontTools.ttLib import TTFont
 from reportlab.pdfbase._fontdata_enc_winansi import WinAnsiEncoding
 
 from pdf_math_audit.cmap import parse_to_unicode
-from pdf_math_audit.limitations import require_supported
+from pdf_math_audit.limitations import AnalysisLimitation, require_supported
 from pdf_math_audit.pdf_indicators import is_math_indicator
 
 
@@ -395,15 +395,39 @@ def _load_true_type_font(resource: str, reference: Any, font: Any) -> LoadedFont
     )
 
 
+def _raised_in_font_tools(error: BaseException) -> bool:
+    """L'échec vient-il du décodeur de polices tiers plutôt que de notre propre code ?"""
+    trace = error.__traceback__
+    while trace is not None:
+        if trace.tb_frame.f_globals.get("__name__", "").startswith("fontTools"):
+            return True
+        trace = trace.tb_next
+    return False
+
+
 def load_font(resource: str, reference: Any) -> LoadedFont:
     font = reference.get_object()
     subtype = str(font.get("/Subtype"))
-    if subtype == "/Type1":
-        return _load_type1_font(resource, reference, font)
-    if subtype == "/Type0":
-        return _load_type0_font(resource, reference, font)
-    if subtype == "/TrueType":
-        return _load_true_type_font(resource, reference, font)
+    try:
+        if subtype == "/Type1":
+            return _load_type1_font(resource, reference, font)
+        if subtype == "/Type0":
+            return _load_type0_font(resource, reference, font)
+        if subtype == "/TrueType":
+            return _load_true_type_font(resource, reference, font)
+    except AnalysisLimitation:
+        raise
+    except Exception as error:
+        # Une police malformée est une limite de cette ressource, pas du document :
+        # sans cette conversion, fontTools fait tomber la qualification entière.
+        if not _raised_in_font_tools(error):
+            raise
+        raise AnalysisLimitation(
+            "unsupported",
+            "embedded_font_not_interpretable",
+            f"{resource}: police embarquée non interprétable "
+            f"({type(error).__name__}: {error})",
+        ) from error
     require_supported(
         False,
         "embedded_font_type_unsupported",

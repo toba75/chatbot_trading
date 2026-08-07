@@ -1,0 +1,1510 @@
+{
+ "classes": {
+  "B": "bruit",
+  "E": "englobante : mathématiques mêlées de prose",
+  "F": "annotation mathématique de figure",
+  "M": "mathématique réelle nette"
+ },
+ "schema_version": 1,
+ "seed": 20260807,
+ "strates": {
+  "docling_seule": {
+   "comptage": {
+    "B": 14,
+    "F": 2,
+    "M": 14
+   },
+   "regions": [
+    {
+     "bbox": [
+      290.93603515625,
+      668.6272583007812,
+      304.3310852050781,
+      695.257568359375
+     ],
+     "book": "Mastering_the_Market_Cycle_-_Howard_Marks.pdf",
+     "classe": "B",
+     "nature_du_bruit": "ornement de chapitre",
+     "page": 121,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "∾"
+    },
+    {
+     "bbox": [
+      364.6225280761719,
+      347.38311767578125,
+      369.105712890625,
+      357.3457336425781
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 253,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "⎤"
+    },
+    {
+     "bbox": [
+      77.76599884033203,
+      79.69026947021484,
+      87.32999420166016,
+      87.66026306152344
+     ],
+     "book": "machine-learning-for-asset-managers.pdf",
+     "classe": "B",
+     "nature_du_bruit": "code",
+     "page": 95,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "f="
+    },
+    {
+     "bbox": [
+      159.10546875,
+      226.44741821289062,
+      171.07546997070312,
+      237.69741821289062
+     ],
+     "book": "Quantitative_value_-_Wesley_gray.pdf",
+     "classe": "B",
+     "nature_du_bruit": "cellule de tableau",
+     "page": 137,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "−0"
+    },
+    {
+     "bbox": [
+      124.9542007446289,
+      248.6802520751953,
+      136.7499237060547,
+      258.6428527832031
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 266,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "√"
+    },
+    {
+     "bbox": [
+      217.07489013671875,
+      69.5564193725586,
+      221.74688720703125,
+      77.5564193725586
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "F",
+     "page": 300,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_picture_candidate_missing"
+     ],
+     "text": "="
+    },
+    {
+     "bbox": [
+      290.93560791015625,
+      732.7232055664062,
+      304.3306579589844,
+      759.353515625
+     ],
+     "book": "Mastering_the_Market_Cycle_-_Howard_Marks.pdf",
+     "classe": "B",
+     "nature_du_bruit": "ornement de chapitre",
+     "page": 221,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "∾"
+    },
+    {
+     "bbox": [
+      99.67533111572266,
+      415.4703063964844,
+      122.35784149169922,
+      423.7095031738281
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "F",
+     "page": 239,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_picture_candidate_missing"
+     ],
+     "text": "n=100"
+    },
+    {
+     "bbox": [
+      271.56597900390625,
+      493.21881103515625,
+      282.2857360839844,
+      503.1814270019531
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 287,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "}"
+    },
+    {
+     "bbox": [
+      129.47369384765625,
+      234.11566162109375,
+      140.4754180908203,
+      252.1217498779297
+     ],
+     "book": "trading-on-momentum-advanced-techniques-for-high-percentage-day-trading.pdf",
+     "classe": "B",
+     "nature_du_bruit": "lettrine",
+     "page": 105,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "O"
+    },
+    {
+     "bbox": [
+      203.2322998046875,
+      241.41412353515625,
+      222.28590393066406,
+      249.68312072753906
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "code",
+     "page": 339,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "=24)"
+    },
+    {
+     "bbox": [
+      208.2149658203125,
+      221.23924255371094,
+      212.69813537597656,
+      231.20184326171875
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 227,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "⎜"
+    },
+    {
+     "bbox": [
+      189.13494873046875,
+      117.60438537597656,
+      198.38023376464844,
+      127.56698608398438
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 335,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "√"
+    },
+    {
+     "bbox": [
+      200.02496337890625,
+      243.4153289794922,
+      211.8206787109375,
+      253.3779296875
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 266,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "√"
+    },
+    {
+     "bbox": [
+      139.3096923828125,
+      154.44741821289062,
+      145.654296875,
+      165.69741821289062
+     ],
+     "book": "Quantitative_value_-_Wesley_gray.pdf",
+     "classe": "M",
+     "page": 267,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "="
+    },
+    {
+     "bbox": [
+      290.935546875,
+      140.7360382080078,
+      304.3305969238281,
+      167.36634826660156
+     ],
+     "book": "Mastering_the_Market_Cycle_-_Howard_Marks.pdf",
+     "classe": "B",
+     "nature_du_bruit": "ornement de chapitre",
+     "page": 230,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "∾"
+    },
+    {
+     "bbox": [
+      289.9194641113281,
+      300.37274169921875,
+      299.4649353027344,
+      311.2818603515625
+     ],
+     "book": "Optimal Trend Following Rules in Two State Switching Regime Models.pdf",
+     "classe": "M",
+     "page": 24,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": ""
+    },
+    {
+     "bbox": [
+      290.93603515625,
+      371.19329833984375,
+      304.3310852050781,
+      397.8236083984375
+     ],
+     "book": "Mastering_the_Market_Cycle_-_Howard_Marks.pdf",
+     "classe": "B",
+     "nature_du_bruit": "ornement de chapitre",
+     "page": 232,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "∾"
+    },
+    {
+     "bbox": [
+      157.4388427734375,
+      127.44741821289062,
+      163.783447265625,
+      138.69741821289062
+     ],
+     "book": "Quantitative_value_-_Wesley_gray.pdf",
+     "classe": "M",
+     "page": 267,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "="
+    },
+    {
+     "bbox": [
+      85.63799285888672,
+      329.5285339355469,
+      103.5166244506836,
+      338.3457336425781
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "marqueur de graphique",
+     "page": 371,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_picture_candidate_missing"
+     ],
+     "text": "++"
+    },
+    {
+     "bbox": [
+      315.70220947265625,
+      131.17990112304688,
+      324.16168212890625,
+      146.17990112304688
+     ],
+     "book": "Quantitative_value_-_Wesley_gray.pdf",
+     "classe": "M",
+     "page": 101,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "="
+    },
+    {
+     "bbox": [
+      479.51922607421875,
+      315.8529052734375,
+      486.7846984863281,
+      326.76202392578125
+     ],
+     "book": "Optimal Trend Following Rules in Two State Switching Regime Models.pdf",
+     "classe": "M",
+     "page": 19,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": ""
+    },
+    {
+     "bbox": [
+      85.90770721435547,
+      208.24143981933594,
+      91.05695343017578,
+      217.0586395263672
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "marqueur de graphique",
+     "page": 370,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_picture_candidate_missing"
+     ],
+     "text": "+"
+    },
+    {
+     "bbox": [
+      137.51998901367188,
+      473.139892578125,
+      150.6935577392578,
+      483.1025085449219
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 198,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "]]"
+    },
+    {
+     "bbox": [
+      118.99220275878906,
+      498.6799621582031,
+      134.95167541503906,
+      513.679931640625
+     ],
+     "book": "dual-momentum-investing-an-innovative-strategy-for-higher-returns-with-lower-risk.pdf",
+     "classe": "B",
+     "nature_du_bruit": "url",
+     "page": 201,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "v="
+    },
+    {
+     "bbox": [
+      265.75,
+      423.8621826171875,
+      278.3380126953125,
+      436.3270263671875
+     ],
+     "book": "vdoc.pub_trend-following-with-managed-futures-the-search-for-crisis-alpha.pdf",
+     "classe": "M",
+     "page": 300,
+     "reasons": [
+      "candidate_relation_invalid"
+     ],
+     "text": "=c"
+    },
+    {
+     "bbox": [
+      211.77047729492188,
+      177.74366760253906,
+      216.9197235107422,
+      186.5608673095703
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "marqueur de graphique",
+     "page": 370,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_picture_candidate_missing"
+     ],
+     "text": "+"
+    },
+    {
+     "bbox": [
+      42.0,
+      48.15211486816406,
+      49.779998779296875,
+      58.15211486816406
+     ],
+     "book": "come-into-my-trading-room-a-complete-guide-to-trading.pdf",
+     "classe": "B",
+     "nature_du_bruit": "folio romain",
+     "page": 9,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_ambiguous"
+     ],
+     "text": "vi"
+    },
+    {
+     "bbox": [
+      117.40219116210938,
+      595.4298706054688,
+      127.52426147460938,
+      610.4298706054688
+     ],
+     "book": "Quantitative_value_-_Wesley_gray.pdf",
+     "classe": "M",
+     "page": 68,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing"
+     ],
+     "text": "="
+    },
+    {
+     "bbox": [
+      240.15377807617188,
+      436.77978515625,
+      258.0101318359375,
+      444.2217712402344
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "code",
+     "page": 112,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete"
+     ],
+     "text": "]]+["
+    }
+   ]
+  },
+  "les_deux": {
+   "comptage": {
+    "B": 15,
+    "E": 3,
+    "F": 1,
+    "M": 11
+   },
+   "regions": [
+    {
+     "bbox": [
+      157.77899169921875,
+      103.14527893066406,
+      182.4186553955078,
+      110.69258880615234
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 91,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "j=…I"
+    },
+    {
+     "bbox": [
+      72.0,
+      272.05615234375,
+      522.6571655273438,
+      286.4508972167969
+     ],
+     "book": "You_Can_Be_a_Stock_Market_Genius_-_Joel_Greenblatt.pdf",
+     "classe": "B",
+     "nature_du_bruit": "ligne de prose",
+     "page": 75,
+     "reasons": [
+      "authoritative_tounicode_control_invalid",
+      "candidate_mixed_text_invalid"
+     ],
+     "text": "involved\tborrowing\tHBJ\tshares\tfrom\ta\tbroker\tand\tselling\tthem"
+    },
+    {
+     "bbox": [
+      141.35400390625,
+      230.66079711914062,
+      157.95399475097656,
+      239.71755981445312
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 282,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "o="
+    },
+    {
+     "bbox": [
+      66.8432846069336,
+      432.4226989746094,
+      181.03306579589844,
+      446.7945251464844
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 227,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "h+=⇔w+t=||w+||−∀t"
+    },
+    {
+     "bbox": [
+      314.8854064941406,
+      125.30657196044922,
+      374.7004699707031,
+      137.26058959960938
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 301,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "x={pi}i=…n"
+    },
+    {
+     "bbox": [
+      92.68219757080078,
+      230.42637634277344,
+      136.3754119873047,
+      242.38070678710938
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 56,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "{bt}t=…T"
+    },
+    {
+     "bbox": [
+      42.93999481201172,
+      380.8616027832031,
+      267.6800537109375,
+      395.2333984375
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 227,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "||r+||r+t≤r+t≤r+t||r+||"
+    },
+    {
+     "bbox": [
+      118.43199920654297,
+      497.4854736328125,
+      163.77850341796875,
+      508.7944641113281
+     ],
+     "book": "machine-learning-for-asset-managers.pdf",
+     "classe": "M",
+     "page": 32,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "σ21λ="
+    },
+    {
+     "bbox": [
+      210.96160888671875,
+      522.4354248046875,
+      213.73121643066406,
+      532.3980102539062
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "index du livre",
+     "page": 388,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "f"
+    },
+    {
+     "bbox": [
+      329.0039978027344,
+      81.44017791748047,
+      377.67889404296875,
+      91.50318908691406
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 335,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "rr+="
+    },
+    {
+     "bbox": [
+      137.13458251953125,
+      337.0588684082031,
+      331.33953857421875,
+      347.12188720703125
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 347,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "Hh=…H"
+    },
+    {
+     "bbox": [
+      277.7100830078125,
+      117.19049072265625,
+      282.2100830078125,
+      119.8184814453125
+     ],
+     "book": "time-compression-trading-exploiting-multiple-time-frames-in-zero-sum-markets-wiley-trading.pdf",
+     "classe": "B",
+     "nature_du_bruit": "figure",
+     "page": 163,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_picture_candidate_missing",
+      "pdf_font_exclusion_intersection",
+      "pdf_opaque_region_intersection"
+     ],
+     "text": "="
+    },
+    {
+     "bbox": [
+      126.6286849975586,
+      511.3318786621094,
+      132.7706756591797,
+      520.2982788085938
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "cellule de tableau",
+     "page": 203,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      120.52226257324219,
+      98.33804321289062,
+      129.48866271972656,
+      104.48003387451172
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "axe de graphique",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      42.93946075439453,
+      211.10337829589844,
+      89.60289764404297,
+      223.05770874023438
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 107,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "{Xt}t=…T"
+    },
+    {
+     "bbox": [
+      216.11886596679688,
+      235.5023956298828,
+      271.02056884765625,
+      247.45660400390625
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 323,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "{−Lt}t=T+…"
+    },
+    {
+     "bbox": [
+      219.153564453125,
+      275.62652587890625,
+      228.11996459960938,
+      281.7685241699219
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      200.08206176757812,
+      282.3121643066406,
+      206.2240447998047,
+      291.278564453125
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "cellule de tableau",
+     "page": 234,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "="
+    },
+    {
+     "bbox": [
+      208.19125366210938,
+      98.34111022949219,
+      217.15765380859375,
+      104.48309326171875
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      78.9134292602539,
+      199.6366424560547,
+      349.6191711425781,
+      209.6996612548828
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 116,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": ")=E−.d∈"
+    },
+    {
+     "bbox": [
+      84.9326400756836,
+      356.9322509765625,
+      89.41580963134766,
+      366.8948669433594
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 253,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "⎢"
+    },
+    {
+     "bbox": [
+      142.43792724609375,
+      321.06341552734375,
+      151.40432739257812,
+      327.2054138183594
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      119.22100067138672,
+      80.83421325683594,
+      130.11700439453125,
+      88.83421325683594
+     ],
+     "book": "machine-learning-for-asset-managers.pdf",
+     "classe": "F",
+     "page": 55,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_picture_candidate_missing",
+      "pdf_opaque_region_intersection"
+     ],
+     "text": "i=0"
+    },
+    {
+     "bbox": [
+      328.7379150390625,
+      321.06512451171875,
+      337.7043151855469,
+      327.2071228027344
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      255.75299072265625,
+      326.12030029296875,
+      280.3926696777344,
+      333.6676330566406
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 89,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_alignment_incomplete",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "i=…I"
+    },
+    {
+     "bbox": [
+      273.945556640625,
+      184.73867797851562,
+      282.9119567871094,
+      190.88067626953125
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      153.40023803710938,
+      189.2142791748047,
+      162.36663818359375,
+      195.35626220703125
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      339.70025634765625,
+      98.33169555664062,
+      348.6666564941406,
+      104.47369384765625
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      262.9832458496094,
+      321.0691833496094,
+      271.94964599609375,
+      327.211181640625
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 113,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      293.1242370605469,
+      144.06082153320312,
+      302.09063720703125,
+      150.20281982421875
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "matrice numerique imprimee",
+     "page": 114,
+     "reasons": [
+      "candidate_content_missing",
+      "docling_text_container_missing",
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    }
+   ]
+  },
+  "preuve_pdf_seule": {
+   "comptage": {
+    "B": 2,
+    "E": 7,
+    "M": 21
+   },
+   "regions": [
+    {
+     "bbox": [
+      277.8876037597656,
+      582.507568359375,
+      284.71197509765625,
+      592.4701538085938
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "B",
+     "nature_du_bruit": "code",
+     "page": 63,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "="
+    },
+    {
+     "bbox": [
+      104.4544448852539,
+      346.84124755859375,
+      336.74285888671875,
+      361.0152893066406
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 294,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "nH."
+    },
+    {
+     "bbox": [
+      195.18576049804688,
+      558.4763793945312,
+      232.52589416503906,
+      568.5392456054688
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 303,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "OI∈−"
+    },
+    {
+     "bbox": [
+      100.79586791992188,
+      234.6013946533203,
+      108.56669616699219,
+      244.56399536132812
+     ],
+     "book": "trading-regime-analysis-the-probability-of-volatility-wiley-trading.pdf",
+     "classe": "B",
+     "nature_du_bruit": "tiret de prose",
+     "page": 106,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "−"
+    },
+    {
+     "bbox": [
+      75.3569564819336,
+      67.45594787597656,
+      88.61043548583984,
+      79.29727172851562
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 91,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "∑T"
+    },
+    {
+     "bbox": [
+      42.939002990722656,
+      132.29627990722656,
+      69.04601287841797,
+      139.84359741210938
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 285,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "t∈t−"
+    },
+    {
+     "bbox": [
+      197.75759887695312,
+      540.7012939453125,
+      268.2480163574219,
+      552.5712890625
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 348,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "x+…+xN=K"
+    },
+    {
+     "bbox": [
+      349.4530029296875,
+      149.069580078125,
+      354.22528076171875,
+      159.03257751464844
+     ],
+     "book": "machine-learning-for-asset-managers.pdf",
+     "classe": "M",
+     "page": 57,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "ρ"
+    },
+    {
+     "bbox": [
+      349.86871337890625,
+      121.93138885498047,
+      356.3622131347656,
+      133.81027221679688
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 278,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "yt"
+    },
+    {
+     "bbox": [
+      151.7100067138672,
+      115.4220962524414,
+      158.39649963378906,
+      124.8250961303711
+     ],
+     "book": "machine-learning-for-asset-managers.pdf",
+     "classe": "M",
+     "page": 38,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "1=2"
+    },
+    {
+     "bbox": [
+      53.676856994628906,
+      359.3753967285156,
+      70.21139526367188,
+      370.915771484375
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 304,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "fvB"
+    },
+    {
+     "bbox": [
+      129.03067016601562,
+      582.4071655273438,
+      370.1009826660156,
+      592.3697509765625
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 98,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "]j"
+    },
+    {
+     "bbox": [
+      231.64199829101562,
+      475.586181640625,
+      252.32083129882812,
+      487.54071044921875
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 104,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "kXt−k"
+    },
+    {
+     "bbox": [
+      305.82000732421875,
+      577.817138671875,
+      343.5635681152344,
+      591.2445068359375
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 90,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "tjj"
+    },
+    {
+     "bbox": [
+      295.364013671875,
+      249.6993865966797,
+      304.86639404296875,
+      261.8134460449219
+     ],
+     "book": "causal-factor-investing.pdf",
+     "classe": "M",
+     "page": 31,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "β1"
+    },
+    {
+     "bbox": [
+      137.77215576171875,
+      458.72015380859375,
+      152.5780029296875,
+      470.59930419921875
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 231,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "SRn"
+    },
+    {
+     "bbox": [
+      286.19146728515625,
+      417.0567626953125,
+      290.1167297363281,
+      427.0193786621094
+     ],
+     "book": "causal-factor-investing.pdf",
+     "classe": "M",
+     "page": 31,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "ε"
+    },
+    {
+     "bbox": [
+      195.32699584960938,
+      145.01622009277344,
+      201.4141387939453,
+      154.97882080078125
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 169,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "F"
+    },
+    {
+     "bbox": [
+      59.112327575683594,
+      582.0938110351562,
+      253.37574768066406,
+      594.27734375
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 105,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "d−k∀k≥."
+    },
+    {
+     "bbox": [
+      232.77999877929688,
+      57.736568450927734,
+      237.6718292236328,
+      67.69956970214844
+     ],
+     "book": "machine-learning-for-asset-managers.pdf",
+     "classe": "M",
+     "page": 112,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "θ"
+    },
+    {
+     "bbox": [
+      54.838523864746094,
+      325.10675048828125,
+      377.68255615234375,
+      335.0693359375
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 347,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "NxHN"
+    },
+    {
+     "bbox": [
+      133.3419952392578,
+      577.7805786132812,
+      151.33937072753906,
+      588.6197509765625
+     ],
+     "book": "machine-learning-for-asset-managers.pdf",
+     "classe": "M",
+     "page": 125,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "<zα"
+    },
+    {
+     "bbox": [
+      156.8699951171875,
+      63.3429069519043,
+      168.04531860351562,
+      75.2686996459961
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 91,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": ")−"
+    },
+    {
+     "bbox": [
+      304.4900207519531,
+      389.7622985839844,
+      310.02923583984375,
+      399.7248840332031
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 343,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "Z"
+    },
+    {
+     "bbox": [
+      129.4293670654297,
+      456.85528564453125,
+      133.693359375,
+      466.8179016113281
+     ],
+     "book": "causal-factor-investing.pdf",
+     "classe": "M",
+     "page": 76,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "ξ"
+    },
+    {
+     "bbox": [
+      318.49969482421875,
+      130.4754180908203,
+      322.4249572753906,
+      140.43801879882812
+     ],
+     "book": "causal-factor-investing.pdf",
+     "classe": "M",
+     "page": 50,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "γ"
+    },
+    {
+     "bbox": [
+      77.17227172851562,
+      106.98456573486328,
+      132.5198974609375,
+      118.91486358642578
+     ],
+     "book": "causal-factor-investing.pdf",
+     "classe": "M",
+     "page": 51,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "βγδ1δ2"
+    },
+    {
+     "bbox": [
+      234.66598510742188,
+      123.34584045410156,
+      256.317626953125,
+      133.94149780273438
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "M",
+     "page": 59,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "t|bt=−"
+    },
+    {
+     "bbox": [
+      47.86225128173828,
+      97.04613494873047,
+      149.3978271484375,
+      111.22042846679688
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 335,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "MNN+r"
+    },
+    {
+     "bbox": [
+      206.10000610351562,
+      274.51885986328125,
+      384.19830322265625,
+      294.6490783691406
+     ],
+     "book": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+     "classe": "E",
+     "page": 122,
+     "reasons": [
+      "pdf_font_exclusion_intersection"
+     ],
+     "text": "j≠i=∑Nj≠iijij⇔=NN−−"
+    }
+   ]
+  }
+ }
+}

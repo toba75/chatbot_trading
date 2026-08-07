@@ -17,6 +17,7 @@ __pycache__/
 /pdfjs-dist-*.tgz
 /experiments/paddle_formula_spike/work/
 /experiments/nougat_shadow/work/
+/qualification/corpus_reference/work/
 
 # PDF de travail à la racine (extraits de débogage)
 /*.pdf
@@ -26,3 +27,6 @@ __pycache__/
 # (décision de conservation : plan 004, étape 1).
 /docs/corpus_reference/*
 !/docs/corpus_reference/manifest.json
+!/docs/corpus_reference/coverage.json
+!/docs/corpus_reference/coverage-report.md
+!/docs/corpus_reference/coverage-sample.json
