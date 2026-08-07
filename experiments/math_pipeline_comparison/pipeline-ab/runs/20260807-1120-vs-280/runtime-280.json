@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-07T22:21:28.611742+00:00",
+  "host": "rousseau@192.168.1.120",
+  "container": "nim-gemma4-26b-a4b-it-backup-280-20260807",
+  "image_reference": "nvcr.io/nim/google/gemma-4-26b-a4b-it:latest",
+  "image_id": "sha256:581f653cd3f1d4d161fcb9926be5b35adc199177b4e8eaaacb001779f03c03a1",
+  "network_mode": "host",
+  "restart_policy": "no",
+  "state": {
+    "status": "exited",
+    "started_at": "2026-08-07T21:51:39.595604121Z",
+    "finished_at": "2026-08-07T22:02:21.047707477Z"
+  },
+  "effective_max_soft_tokens": 280,
+  "configuration": {
+    "fallback": {
+      "path": "/opt/nim/fallback.yaml",
+      "sha256": "50dee723656ec4fe1640f05161adccc464b77ab5308fd417463c02ed76fab248",
+      "override": null
+    },
+    "processor": {
+      "path": "/opt/nim/workspace/processor_config.json",
+      "sha256": "32bdf45d2ad4cc29a0822ddd157a182de76644f0419a6228d151495256e9813c",
+      "max_soft_tokens": {
+        "$.image_processor.max_soft_tokens": 280,
+        "$.video_processor.max_soft_tokens": 70
+      }
+    },
+    "model": {
+      "path": "/opt/nim/workspace/config.json",
+      "sha256": "ed0c1eb3633de771906e9ba004a44cc5635bcc06ee2062077c3d2e88a50707d3",
+      "vision_soft_tokens_per_image": 280
+    }
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "arm": "1120",
+  "repeat": 3,
+  "max_soft_tokens": 1120,
+  "started_at": "2026-08-07T21:50:38.702231+00:00",
+  "elapsed_seconds": 6.069,
+  "endpoint": "http://127.0.0.1:8000",
+  "inputs": {
+    "pdf": "C:\\Users\\maxim\\python\\chatbot_trading\\experiments\\math_pipeline_comparison\\source-pages-7-10.pdf",
+    "pdf_sha256": "219c2064ba9292d286f4b3bcc65eb9e94b418705c51b9f98f54f2ad70321ddf1",
+    "docling_document": "C:\\Users\\maxim\\python\\chatbot_trading\\experiments\\math_pipeline_comparison\\docling-subset-document.json",
+    "docling_document_sha256": "a1a6fea517971cee7771417610db9ae619a6996516f81bb1028067c77d6104fe"
+  },
+  "gemma_runtime": {
+    "image_reference": "local/nim-google-gemma4-26b-a4b-it:max-soft-tokens-1120",
+    "image_id": "sha256:d407711cfe5572be6050ac8b65cc44ef14c308b5831de8923388bc67a192e181",
+    "fallback_sha256": "0a5bc3ad21d0e4177299871081dcc79cceeefe7f853b9ad325404acec4dca2e1"
+  },
+  "correction": {
+    "accepted": 33,
+    "accepted_regions": 33,
+    "artifacts": {
+      "correction_evidence": {
+        "bytes": 61665,
+        "sha256": "cbeb60ad2490577756104a24e56fa1e732007720cd28559f13bb83b6c75445ea"
+      },
+      "corrections": {
+        "bytes": 113531,
+        "sha256": "ab1cfd62286c6378b5cb483913942317852225d3059c098d329ba131e38101f1"
+      },
+      "derived_docling_document": {
+        "bytes": 592636,
+        "sha256": "bc5e8092d04ff838fa6e1c75be6077f81cf58242e55b9c836d2e211c86f76079"
+      },
+      "derived_html": {
+        "bytes": 20296,
+        "sha256": "5bace6e491a667810ba6c56d1abb0b77bbd1ebe6ed3ad80040f46e9ac8446d47"
+      },
+      "derived_markdown": {
+        "bytes": 5423,
+        "sha256": "722ce80cb099cee1cc27fcefb16d793b512f1265002b3fab4ee6160934197c3a"
+      }
+    },
+    "engine": {
+      "dpi": 600,
+      "model": "google/gemma-4-26B-A4B-it",
+      "padding_points": 8.0,
+      "selected": {
+        "deterministic_source": 31,
+        "vision_proven_by_source": 2
+      },
+      "strategy": "deterministic_source_then_proven_vision",
+      "vision_calls": 3
+    },
+    "failed": 0,
+    "regions": 36,
+    "rejected": 3,
+    "status": "corrected",
+    "target_region_ids": [
+      "pdf-source:1:733",
+      "pdf-source:1:758",
+      "pdf-source:1:925",
+      "pdf-source:1:955",
+      "pdf-source:1:1008",
+      "pdf-source:1:1053",
+      "pdf-source:1:1081",
+      "pdf-source:1:1230",
+      "pdf-source:1:1266",
+      "pdf-source:1:1273",
+      "pdf-source:1:1317",
+      "pdf-source:1:1338",
+      "pdf-source:1:1506",
+      "pdf-source:1:1804",
+      "pdf-source:2:376",
+      "pdf-source:2:423",
+      "pdf-source:2:449",
+      "pdf-source:2:474",
+      "pdf-source:2:481",
+      "pdf-source:2:557",
+      "pdf-source:2:823",
+      "pdf-source:2:840",
+      "pdf-source:2:1068",
+      "pdf-source:2:1073",
+      "pdf-source:2:1088",
+      "pdf-source:2:1154",
+      "pdf-source:2:1173",
+      "pdf-source:2:1344",
+      "pdf-source:2:1355",
+      "pdf-source:2:1468",
+      "pdf-source:2:1473",
+      "pdf-source:2:1724",
+      "pdf-source:2:1737",
+      "pdf-source:2:1770",
+      "pdf-source:2:1840",
+      "pdf-source:2:1859"
+    ],
+    "targets": 36
+  },
+  "record_statuses": {
+    "accepted": 33,
+    "rejected": 3,
+    "failed": 0
+  },
+  "usage": {
+    "calls": [
+      {
+        "target": "pdf-source_2_1173",
+        "response_id": "chatcmpl-836f52408d195479",
+        "model": "google/gemma-4-26B-A4B-it",
+        "finish_reason": "stop",
+        "prompt_tokens": 1135,
+        "completion_tokens": 26,
+        "total_tokens": 1161
+      },
+      {
+        "target": "pdf-source_2_449",
+        "response_id": "chatcmpl-92d84ce937a1b9f5",
+        "model": "google/gemma-4-26B-A4B-it",
+        "finish_reason": "stop",
+        "prompt_tokens": 1160,
+        "completion_tokens": 10,
+        "total_tokens": 1170
+      },
+      {
+        "target": "pdf-source_2_840",
+        "response_id": "chatcmpl-baeed022f5f9d351",
+        "model": "google/gemma-4-26B-A4B-it",
+        "finish_reason": "stop",
+        "prompt_tokens": 1161,
+        "completion_tokens": 15,
+        "total_tokens": 1176
+      }
+    ],
+    "prompt_tokens": 3456,
+    "completion_tokens": 51,
+    "total_tokens": 3507
+  },
+  "artifacts": {
+    "evidence": {
+      "bytes": 225994,
+      "sha256": "72a32cf08f5c83c0cc48ad98c2661df5bf1f20633ee12477948cba00224e3769",
+      "chunks": 4
+    },
+    "corrections": {
+      "bytes": 113531,
+      "sha256": "ab1cfd62286c6378b5cb483913942317852225d3059c098d329ba131e38101f1",
+      "chunks": 2
+    },
+    "correction_evidence": {
+      "bytes": 61665,
+      "sha256": "cbeb60ad2490577756104a24e56fa1e732007720cd28559f13bb83b6c75445ea",
+      "chunks": 1
+    },
+    "derived_docling_document": {
+      "bytes": 592636,
+      "sha256": "bc5e8092d04ff838fa6e1c75be6077f81cf58242e55b9c836d2e211c86f76079",
+      "chunks": 10
+    },
+    "derived_html": {
+      "bytes": 20296,
+      "sha256": "5bace6e491a667810ba6c56d1abb0b77bbd1ebe6ed3ad80040f46e9ac8446d47",
+      "chunks": 1
+    },
+    "derived_markdown": {
+      "bytes": 5423,
+      "sha256": "722ce80cb099cee1cc27fcefb16d793b512f1265002b3fab4ee6160934197c3a",
+      "chunks": 1
+    },
+    "native_page_html": {
+      "bytes": 15500,
+      "sha256": "4b99d4323f1a6a0e1d4be1d78c16fd9f81114e89551488ec97039d6171e597c6",
+      "chunks": 1
+    },
+    "report": {
+      "bytes": 276578,
+      "sha256": "54507fae63106ef5128f43d72924a4ab549ff9987a6023dcc297afed5075abd6",
+      "chunks": 5
+    }
+  }
+}

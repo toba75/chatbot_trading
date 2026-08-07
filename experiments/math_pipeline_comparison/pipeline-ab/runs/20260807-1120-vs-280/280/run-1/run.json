@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "arm": "280",
+  "repeat": 1,
+  "max_soft_tokens": 280,
+  "started_at": "2026-08-07T22:00:16.887454+00:00",
+  "elapsed_seconds": 26.597,
+  "endpoint": "http://127.0.0.1:8000",
+  "inputs": {
+    "pdf": "C:\\Users\\maxim\\python\\chatbot_trading\\experiments\\math_pipeline_comparison\\source-pages-7-10.pdf",
+    "pdf_sha256": "219c2064ba9292d286f4b3bcc65eb9e94b418705c51b9f98f54f2ad70321ddf1",
+    "docling_document": "C:\\Users\\maxim\\python\\chatbot_trading\\experiments\\math_pipeline_comparison\\docling-subset-document.json",
+    "docling_document_sha256": "a1a6fea517971cee7771417610db9ae619a6996516f81bb1028067c77d6104fe"
+  },
+  "gemma_runtime": {
+    "image_reference": "nvcr.io/nim/google/gemma-4-26b-a4b-it:latest",
+    "image_id": "sha256:581f653cd3f1d4d161fcb9926be5b35adc199177b4e8eaaacb001779f03c03a1",
+    "fallback_sha256": "50dee723656ec4fe1640f05161adccc464b77ab5308fd417463c02ed76fab248"
+  },
+  "correction": {
+    "accepted": 34,
+    "accepted_regions": 34,
+    "artifacts": {
+      "correction_evidence": {
+        "bytes": 61662,
+        "sha256": "174dbb2793a811777cafa9d84c097a4b448aab7439fbf075d2f2a7d617d8eea4"
+      },
+      "corrections": {
+        "bytes": 114405,
+        "sha256": "f0f20a88c48f7226b1e6902aea8d116e3e0426f477a9778a1c1274ff7cde6096"
+      },
+      "derived_docling_document": {
+        "bytes": 592640,
+        "sha256": "2c3ef056522ec5261f1dea6511f600e1a87e93b4d8dea095e1fabdac2dd0d83d"
+      },
+      "derived_html": {
+        "bytes": 20331,
+        "sha256": "01a9569320754b1e5bee7d70c54f591b22ac0f76c63aa7055cc1a3a13472a407"
+      },
+      "derived_markdown": {
+        "bytes": 5426,
+        "sha256": "e652b239b26de9c92e820051a146a2d40bb6079200216867bca1ca455ec7f0b8"
+      }
+    },
+    "engine": {
+      "dpi": 600,
+      "model": "google/gemma-4-26B-A4B-it",
+      "padding_points": 8.0,
+      "selected": {
+        "deterministic_source": 31,
+        "vision_proven_by_source": 3
+      },
+      "strategy": "deterministic_source_then_proven_vision",
+      "vision_calls": 3
+    },
+    "failed": 0,
+    "regions": 36,
+    "rejected": 2,
+    "status": "corrected",
+    "target_region_ids": [
+      "pdf-source:1:733",
+      "pdf-source:1:758",
+      "pdf-source:1:925",
+      "pdf-source:1:955",
+      "pdf-source:1:1008",
+      "pdf-source:1:1053",
+      "pdf-source:1:1081",
+      "pdf-source:1:1230",
+      "pdf-source:1:1266",
+      "pdf-source:1:1273",
+      "pdf-source:1:1317",
+      "pdf-source:1:1338",
+      "pdf-source:1:1506",
+      "pdf-source:1:1804",
+      "pdf-source:2:376",
+      "pdf-source:2:423",
+      "pdf-source:2:449",
+      "pdf-source:2:474",
+      "pdf-source:2:481",
+      "pdf-source:2:557",
+      "pdf-source:2:823",
+      "pdf-source:2:840",
+      "pdf-source:2:1068",
+      "pdf-source:2:1073",
+      "pdf-source:2:1088",
+      "pdf-source:2:1154",
+      "pdf-source:2:1173",
+      "pdf-source:2:1344",
+      "pdf-source:2:1355",
+      "pdf-source:2:1468",
+      "pdf-source:2:1473",
+      "pdf-source:2:1724",
+      "pdf-source:2:1737",
+      "pdf-source:2:1770",
+      "pdf-source:2:1840",
+      "pdf-source:2:1859"
+    ],
+    "targets": 36
+  },
+  "record_statuses": {
+    "accepted": 34,
+    "rejected": 2,
+    "failed": 0
+  },
+  "usage": {
+    "calls": [
+      {
+        "target": "pdf-source_2_1173",
+        "response_id": "chatcmpl-91527d1fe84e7417",
+        "model": "google/gemma-4-26B-A4B-it",
+        "finish_reason": "stop",
+        "prompt_tokens": 325,
+        "completion_tokens": 26,
+        "total_tokens": 351
+      },
+      {
+        "target": "pdf-source_2_449",
+        "response_id": "chatcmpl-9a8f09a0628750a8",
+        "model": "google/gemma-4-26B-A4B-it",
+        "finish_reason": "stop",
+        "prompt_tokens": 311,
+        "completion_tokens": 10,
+        "total_tokens": 321
+      },
+      {
+        "target": "pdf-source_2_840",
+        "response_id": "chatcmpl-87202003c1e3aa36",
+        "model": "google/gemma-4-26B-A4B-it",
+        "finish_reason": "stop",
+        "prompt_tokens": 328,
+        "completion_tokens": 15,
+        "total_tokens": 343
+      }
+    ],
+    "prompt_tokens": 964,
+    "completion_tokens": 51,
+    "total_tokens": 1015
+  },
+  "artifacts": {
+    "evidence": {
+      "bytes": 225994,
+      "sha256": "72a32cf08f5c83c0cc48ad98c2661df5bf1f20633ee12477948cba00224e3769",
+      "chunks": 4
+    },
+    "corrections": {
+      "bytes": 114405,
+      "sha256": "f0f20a88c48f7226b1e6902aea8d116e3e0426f477a9778a1c1274ff7cde6096",
+      "chunks": 2
+    },
+    "correction_evidence": {
+      "bytes": 61662,
+      "sha256": "174dbb2793a811777cafa9d84c097a4b448aab7439fbf075d2f2a7d617d8eea4",
+      "chunks": 1
+    },
+    "derived_docling_document": {
+      "bytes": 592640,
+      "sha256": "2c3ef056522ec5261f1dea6511f600e1a87e93b4d8dea095e1fabdac2dd0d83d",
+      "chunks": 10
+    },
+    "derived_html": {
+      "bytes": 20331,
+      "sha256": "01a9569320754b1e5bee7d70c54f591b22ac0f76c63aa7055cc1a3a13472a407",
+      "chunks": 1
+    },
+    "derived_markdown": {
+      "bytes": 5426,
+      "sha256": "e652b239b26de9c92e820051a146a2d40bb6079200216867bca1ca455ec7f0b8",
+      "chunks": 1
+    },
+    "native_page_html": {
+      "bytes": 15500,
+      "sha256": "4b99d4323f1a6a0e1d4be1d78c16fd9f81114e89551488ec97039d6171e597c6",
+      "chunks": 1
+    },
+    "report": {
+      "bytes": 276618,
+      "sha256": "57f8100c754fc3857e75eb63c0d0bad4042f5f6f9b93c78f5192487685381035",
+      "chunks": 5
+    }
+  }
+}

@@ -1,0 +1,4898 @@
+{
+  "summary": {
+    "status": "corrected",
+    "regions": 36,
+    "target_region_ids": [
+      "pdf-source:1:733",
+      "pdf-source:1:758",
+      "pdf-source:1:925",
+      "pdf-source:1:955",
+      "pdf-source:1:1008",
+      "pdf-source:1:1053",
+      "pdf-source:1:1081",
+      "pdf-source:1:1230",
+      "pdf-source:1:1266",
+      "pdf-source:1:1273",
+      "pdf-source:1:1317",
+      "pdf-source:1:1338",
+      "pdf-source:1:1506",
+      "pdf-source:1:1804",
+      "pdf-source:2:376",
+      "pdf-source:2:423",
+      "pdf-source:2:449",
+      "pdf-source:2:474",
+      "pdf-source:2:481",
+      "pdf-source:2:557",
+      "pdf-source:2:823",
+      "pdf-source:2:840",
+      "pdf-source:2:1068",
+      "pdf-source:2:1073",
+      "pdf-source:2:1088",
+      "pdf-source:2:1154",
+      "pdf-source:2:1173",
+      "pdf-source:2:1344",
+      "pdf-source:2:1355",
+      "pdf-source:2:1468",
+      "pdf-source:2:1473",
+      "pdf-source:2:1724",
+      "pdf-source:2:1737",
+      "pdf-source:2:1770",
+      "pdf-source:2:1840",
+      "pdf-source:2:1859"
+    ],
+    "targets": 36,
+    "accepted": 33,
+    "accepted_regions": 33,
+    "rejected": 3,
+    "failed": 0,
+    "engine": {
+      "model": "google/gemma-4-26B-A4B-it",
+      "dpi": 600,
+      "padding_points": 8.0,
+      "strategy": "deterministic_source_then_proven_vision",
+      "selected": {
+        "deterministic_source": 31,
+        "vision_proven_by_source": 2
+      },
+      "vision_calls": 3
+    }
+  },
+  "records": [
+    {
+      "target_id": "pdf-source:1:733",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:733"
+      ],
+      "region_id": "pdf-source:1:733",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        81,
+        119
+      ],
+      "before": "{ ( x$_{i}$ , y$_{i}$ ) } N i = $_{1}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:733",
+          "candidate_charspan": [
+            81,
+            119
+          ],
+          "candidate_text": "{ ( x$_{i}$ , y$_{i}$ ) } N i = $_{1}$",
+          "tokens": [
+            "{",
+            "(",
+            "x",
+            "i",
+            ",",
+            "y",
+            "i",
+            ")",
+            "}",
+            "i",
+            "=",
+            "1",
+            "N"
+          ],
+          "signature": [
+            "{",
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>",
+            ",",
+            "y",
+            "<sub>",
+            "i",
+            "</sub>",
+            ")",
+            "}",
+            "<sub>",
+            "i",
+            "=",
+            "1",
+            "</sub>",
+            "<sup>",
+            "N",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 736,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 735
+            },
+            {
+              "sequence_index": 739,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 738
+            },
+            {
+              "sequence_index": 742,
+              "token": "N",
+              "role": "superscript",
+              "anchor_sequence_index": 741
+            },
+            {
+              "sequence_index": 743,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 741
+            },
+            {
+              "sequence_index": 744,
+              "token": "=",
+              "role": "subscript",
+              "anchor_sequence_index": 741
+            },
+            {
+              "sequence_index": 745,
+              "token": "1",
+              "role": "subscript",
+              "anchor_sequence_index": 741
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "{",
+        "(",
+        "x",
+        "i",
+        ",",
+        "y",
+        "i",
+        ")",
+        "}",
+        "i",
+        "=",
+        "1",
+        "N"
+      ],
+      "source_signature": [
+        "{",
+        "(",
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>",
+        ",",
+        "y",
+        "<sub>",
+        "i",
+        "</sub>",
+        ")",
+        "}",
+        "<sub>",
+        "i",
+        "=",
+        "1",
+        "</sub>",
+        "<sup>",
+        "N",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 736,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 735
+        },
+        {
+          "sequence_index": 739,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 738
+        },
+        {
+          "sequence_index": 742,
+          "token": "N",
+          "role": "superscript",
+          "anchor_sequence_index": 741
+        },
+        {
+          "sequence_index": 743,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 741
+        },
+        {
+          "sequence_index": 744,
+          "token": "=",
+          "role": "subscript",
+          "anchor_sequence_index": 741
+        },
+        {
+          "sequence_index": 745,
+          "token": "1",
+          "role": "subscript",
+          "anchor_sequence_index": 741
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\{ ( \\mathbf{x}_{i} , y_{i} ) \\}_{i = 1}^{N}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "{",
+            "(",
+            "x",
+            "i",
+            ",",
+            "y",
+            "i",
+            ")",
+            "}",
+            "i",
+            "=",
+            "1",
+            "N"
+          ],
+          "proposal_signature": [
+            "{",
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>",
+            ",",
+            "y",
+            "<sub>",
+            "i",
+            "</sub>",
+            ")",
+            "}",
+            "<sub>",
+            "i",
+            "=",
+            "1",
+            "</sub>",
+            "<sup>",
+            "N",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "\\{ ( \\mathbf{x}_{i} , y_{i} ) \\}_{i = 1}^{N}",
+      "proposal_tokens": [
+        "{",
+        "(",
+        "x",
+        "i",
+        ",",
+        "y",
+        "i",
+        ")",
+        "}",
+        "i",
+        "=",
+        "1",
+        "N"
+      ],
+      "proposal_signature": [
+        "{",
+        "(",
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>",
+        ",",
+        "y",
+        "<sub>",
+        "i",
+        "</sub>",
+        ")",
+        "}",
+        "<sub>",
+        "i",
+        "=",
+        "1",
+        "</sub>",
+        "<sup>",
+        "N",
+        "</sup>"
+      ],
+      "after": "$\\{ ( \\mathbf{x}_{i} , y_{i} ) \\}_{i = 1}^{N}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"81:127\" data-correction-id=\"pdf-source:1:733\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mo stretchy=\"false\">&#x0007B;</mo><mo stretchy=\"false\">&#x00028;</mo><msub><mi>&#x1D431;</mi><mrow><mi>i</mi></mrow></msub><mo>&#x0002C;</mo><msub><mi>y</mi><mrow><mi>i</mi></mrow></msub><mo stretchy=\"false\">&#x00029;</mo><msubsup><mo stretchy=\"false\">&#x0007D;</mo><mrow><mi>i</mi><mo>&#x0003D;</mo><mn>1</mn></mrow><mrow><mi>N</mi></mrow></msubsup></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        81,
+        127
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:758",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:758"
+      ],
+      "region_id": "pdf-source:1:758",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        134,
+        141
+      ],
+      "before": "x$_{i}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:758",
+          "candidate_charspan": [
+            134,
+            141
+          ],
+          "candidate_text": "x$_{i}$",
+          "tokens": [
+            "x",
+            "i"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 759,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 758
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "i"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 759,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 758
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}_{i}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "i"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}_{i}",
+      "proposal_tokens": [
+        "x",
+        "i"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "after": "$\\mathbf{x}_{i}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"142:158\" data-correction-id=\"pdf-source:1:758\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>&#x1D431;</mi><mrow><mi>i</mi></mrow></msub></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        142,
+        158
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:925",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:925"
+      ],
+      "region_id": "pdf-source:1:925",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        352,
+        364
+      ],
+      "before": "x ( j $^{)}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:925",
+          "candidate_charspan": [
+            352,
+            364
+          ],
+          "candidate_text": "x ( j $^{)}$",
+          "tokens": [
+            "x",
+            "(",
+            "j",
+            ")"
+          ],
+          "signature": [
+            "x",
+            "<sup>",
+            "(",
+            "j",
+            ")",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 926,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 925
+            },
+            {
+              "sequence_index": 927,
+              "token": "j",
+              "role": "superscript",
+              "anchor_sequence_index": 925
+            },
+            {
+              "sequence_index": 928,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 925
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "(",
+        "j",
+        ")"
+      ],
+      "source_signature": [
+        "x",
+        "<sup>",
+        "(",
+        "j",
+        ")",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 926,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 925
+        },
+        {
+          "sequence_index": 927,
+          "token": "j",
+          "role": "superscript",
+          "anchor_sequence_index": 925
+        },
+        {
+          "sequence_index": 928,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 925
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "x^{( j )}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "(",
+            "j",
+            ")"
+          ],
+          "proposal_signature": [
+            "x",
+            "<sup>",
+            "(",
+            "j",
+            ")",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "x^{( j )}",
+      "proposal_tokens": [
+        "x",
+        "(",
+        "j",
+        ")"
+      ],
+      "proposal_signature": [
+        "x",
+        "<sup>",
+        "(",
+        "j",
+        ")",
+        "</sup>"
+      ],
+      "after": "$x^{( j )}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"369:380\" data-correction-id=\"pdf-source:1:925\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>x</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mi>j</mi><mo stretchy=\"false\">&#x00029;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        369,
+        380
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:955",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:955"
+      ],
+      "region_id": "pdf-source:1:955",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        396,
+        397
+      ],
+      "before": "x",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:955",
+          "candidate_charspan": [
+            396,
+            397
+          ],
+          "candidate_text": "x",
+          "tokens": [
+            "x"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "x"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}",
+      "proposal_tokens": [
+        "x"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "after": "$\\mathbf{x}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"412:424\" data-correction-id=\"pdf-source:1:955\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>&#x1D431;</mi></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        412,
+        424
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1008",
+      "kind": "render_normalization",
+      "region_ids": [
+        "pdf-source:1:1008"
+      ],
+      "region_id": "pdf-source:1:1008",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        461,
+        471
+      ],
+      "before": "x $^{(1)}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1008",
+          "candidate_charspan": [
+            461,
+            471
+          ],
+          "candidate_text": "x $^{(1)}$",
+          "tokens": [
+            "x",
+            "(",
+            "1",
+            ")"
+          ],
+          "signature": [
+            "x",
+            "<sup>",
+            "(",
+            "1",
+            ")",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1009,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 1008
+            },
+            {
+              "sequence_index": 1010,
+              "token": "1",
+              "role": "superscript",
+              "anchor_sequence_index": 1008
+            },
+            {
+              "sequence_index": 1011,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 1008
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "(",
+        "1",
+        ")"
+      ],
+      "source_signature": [
+        "x",
+        "<sup>",
+        "(",
+        "1",
+        ")",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1009,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 1008
+        },
+        {
+          "sequence_index": 1010,
+          "token": "1",
+          "role": "superscript",
+          "anchor_sequence_index": 1008
+        },
+        {
+          "sequence_index": 1011,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 1008
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "x^{( 1 )}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "(",
+            "1",
+            ")"
+          ],
+          "proposal_signature": [
+            "x",
+            "<sup>",
+            "(",
+            "1",
+            ")",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "x^{( 1 )}",
+      "proposal_tokens": [
+        "x",
+        "(",
+        "1",
+        ")"
+      ],
+      "proposal_signature": [
+        "x",
+        "<sup>",
+        "(",
+        "1",
+        ")",
+        "</sup>"
+      ],
+      "after": "$x^{( 1 )}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"488:499\" data-correction-id=\"pdf-source:1:1008\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>x</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>1</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        488,
+        499
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1053",
+      "kind": "render_normalization",
+      "region_ids": [
+        "pdf-source:1:1053"
+      ],
+      "region_id": "pdf-source:1:1053",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        521,
+        531
+      ],
+      "before": "x $^{(2)}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1053",
+          "candidate_charspan": [
+            521,
+            531
+          ],
+          "candidate_text": "x $^{(2)}$",
+          "tokens": [
+            "x",
+            "(",
+            "2",
+            ")"
+          ],
+          "signature": [
+            "x",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1054,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 1053
+            },
+            {
+              "sequence_index": 1055,
+              "token": "2",
+              "role": "superscript",
+              "anchor_sequence_index": 1053
+            },
+            {
+              "sequence_index": 1056,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 1053
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "(",
+        "2",
+        ")"
+      ],
+      "source_signature": [
+        "x",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1054,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 1053
+        },
+        {
+          "sequence_index": 1055,
+          "token": "2",
+          "role": "superscript",
+          "anchor_sequence_index": 1053
+        },
+        {
+          "sequence_index": 1056,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 1053
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "x^{( 2 )}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "(",
+            "2",
+            ")"
+          ],
+          "proposal_signature": [
+            "x",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "x^{( 2 )}",
+      "proposal_tokens": [
+        "x",
+        "(",
+        "2",
+        ")"
+      ],
+      "proposal_signature": [
+        "x",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>"
+      ],
+      "after": "$x^{( 2 )}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"549:560\" data-correction-id=\"pdf-source:1:1053\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>x</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>2</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        549,
+        560
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1081",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:1081"
+      ],
+      "region_id": "pdf-source:1:1081",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        561,
+        566
+      ],
+      "before": "x (3)",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1081",
+          "candidate_charspan": [
+            561,
+            566
+          ],
+          "candidate_text": "x (3)",
+          "tokens": [
+            "x",
+            "(",
+            "3",
+            ")"
+          ],
+          "signature": [
+            "x",
+            "<sup>",
+            "(",
+            "3",
+            ")",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1082,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 1081
+            },
+            {
+              "sequence_index": 1083,
+              "token": "3",
+              "role": "superscript",
+              "anchor_sequence_index": 1081
+            },
+            {
+              "sequence_index": 1084,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 1081
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "(",
+        "3",
+        ")"
+      ],
+      "source_signature": [
+        "x",
+        "<sup>",
+        "(",
+        "3",
+        ")",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1082,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 1081
+        },
+        {
+          "sequence_index": 1083,
+          "token": "3",
+          "role": "superscript",
+          "anchor_sequence_index": 1081
+        },
+        {
+          "sequence_index": 1084,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 1081
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "x^{( 3 )}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "(",
+            "3",
+            ")"
+          ],
+          "proposal_signature": [
+            "x",
+            "<sup>",
+            "(",
+            "3",
+            ")",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "x^{( 3 )}",
+      "proposal_tokens": [
+        "x",
+        "(",
+        "3",
+        ")"
+      ],
+      "proposal_signature": [
+        "x",
+        "<sup>",
+        "(",
+        "3",
+        ")",
+        "</sup>"
+      ],
+      "after": "$x^{( 3 )}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"590:601\" data-correction-id=\"pdf-source:1:1081\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>x</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>3</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        590,
+        601
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1230",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:1230"
+      ],
+      "region_id": "pdf-source:1:1230",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        744,
+        751
+      ],
+      "before": "x (2) i",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1230",
+          "candidate_charspan": [
+            744,
+            751
+          ],
+          "candidate_text": "x (2) i",
+          "tokens": [
+            "x",
+            "i",
+            "(",
+            "2",
+            ")"
+          ],
+          "signature": [
+            "x",
+            "<sub>",
+            "i",
+            "</sub>",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1231,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 1230
+            },
+            {
+              "sequence_index": 1232,
+              "token": "2",
+              "role": "superscript",
+              "anchor_sequence_index": 1230
+            },
+            {
+              "sequence_index": 1233,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 1230
+            },
+            {
+              "sequence_index": 1234,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1230
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "i",
+        "(",
+        "2",
+        ")"
+      ],
+      "source_signature": [
+        "x",
+        "<sub>",
+        "i",
+        "</sub>",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1231,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 1230
+        },
+        {
+          "sequence_index": 1232,
+          "token": "2",
+          "role": "superscript",
+          "anchor_sequence_index": 1230
+        },
+        {
+          "sequence_index": 1233,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 1230
+        },
+        {
+          "sequence_index": 1234,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1230
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "x_{i}^{( 2 )}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "i",
+            "(",
+            "2",
+            ")"
+          ],
+          "proposal_signature": [
+            "x",
+            "<sub>",
+            "i",
+            "</sub>",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "x_{i}^{( 2 )}",
+      "proposal_tokens": [
+        "x",
+        "i",
+        "(",
+        "2",
+        ")"
+      ],
+      "proposal_signature": [
+        "x",
+        "<sub>",
+        "i",
+        "</sub>",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>"
+      ],
+      "after": "$x_{i}^{( 2 )}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"779:794\" data-correction-id=\"pdf-source:1:1230\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msubsup><mi>x</mi><mrow><mi>i</mi></mrow><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>2</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msubsup></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        779,
+        794
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1266",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:1266"
+      ],
+      "region_id": "pdf-source:1:1266",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        790,
+        797
+      ],
+      "before": "x$_{i}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1266",
+          "candidate_charspan": [
+            790,
+            797
+          ],
+          "candidate_text": "x$_{i}$",
+          "tokens": [
+            "x",
+            "i"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1267,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1266
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "i"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1267,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1266
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}_{i}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "i"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}_{i}",
+      "proposal_tokens": [
+        "x",
+        "i"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "after": "$\\mathbf{x}_{i}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"833:849\" data-correction-id=\"pdf-source:1:1266\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>&#x1D431;</mi><mrow><mi>i</mi></mrow></msub></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        833,
+        849
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1273",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:1273"
+      ],
+      "region_id": "pdf-source:1:1273",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        805,
+        812
+      ],
+      "before": "x (2) k",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1273",
+          "candidate_charspan": [
+            805,
+            812
+          ],
+          "candidate_text": "x (2) k",
+          "tokens": [
+            "x",
+            "k",
+            "(",
+            "2",
+            ")"
+          ],
+          "signature": [
+            "x",
+            "<sub>",
+            "k",
+            "</sub>",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1274,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 1273
+            },
+            {
+              "sequence_index": 1275,
+              "token": "2",
+              "role": "superscript",
+              "anchor_sequence_index": 1273
+            },
+            {
+              "sequence_index": 1276,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 1273
+            },
+            {
+              "sequence_index": 1277,
+              "token": "k",
+              "role": "subscript",
+              "anchor_sequence_index": 1273
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "k",
+        "(",
+        "2",
+        ")"
+      ],
+      "source_signature": [
+        "x",
+        "<sub>",
+        "k",
+        "</sub>",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1274,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 1273
+        },
+        {
+          "sequence_index": 1275,
+          "token": "2",
+          "role": "superscript",
+          "anchor_sequence_index": 1273
+        },
+        {
+          "sequence_index": 1276,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 1273
+        },
+        {
+          "sequence_index": 1277,
+          "token": "k",
+          "role": "subscript",
+          "anchor_sequence_index": 1273
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "x_{k}^{( 2 )}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "k",
+            "(",
+            "2",
+            ")"
+          ],
+          "proposal_signature": [
+            "x",
+            "<sub>",
+            "k",
+            "</sub>",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "x_{k}^{( 2 )}",
+      "proposal_tokens": [
+        "x",
+        "k",
+        "(",
+        "2",
+        ")"
+      ],
+      "proposal_signature": [
+        "x",
+        "<sub>",
+        "k",
+        "</sub>",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>"
+      ],
+      "after": "$x_{k}^{( 2 )}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"857:872\" data-correction-id=\"pdf-source:1:1273\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msubsup><mi>x</mi><mrow><mi>k</mi></mrow><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>2</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msubsup></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        857,
+        872
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1317",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:1317"
+      ],
+      "region_id": "pdf-source:1:1317",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        861,
+        868
+      ],
+      "before": "x$_{k}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1317",
+          "candidate_charspan": [
+            861,
+            868
+          ],
+          "candidate_text": "x$_{k}$",
+          "tokens": [
+            "x",
+            "k"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "k",
+            "</sub>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1318,
+              "token": "k",
+              "role": "subscript",
+              "anchor_sequence_index": 1317
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "k"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "k",
+        "</sub>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1318,
+          "token": "k",
+          "role": "subscript",
+          "anchor_sequence_index": 1317
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}_{k}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "k"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "k",
+            "</sub>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}_{k}",
+      "proposal_tokens": [
+        "x",
+        "k"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "k",
+        "</sub>"
+      ],
+      "after": "$\\mathbf{x}_{k}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"921:937\" data-correction-id=\"pdf-source:1:1317\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>&#x1D431;</mi><mrow><mi>k</mi></mrow></msub></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        921,
+        937
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1338",
+      "kind": "render_normalization",
+      "region_ids": [
+        "pdf-source:1:1338"
+      ],
+      "region_id": "pdf-source:1:1338",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        901,
+        908
+      ],
+      "before": "y$_{i}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1338",
+          "candidate_charspan": [
+            901,
+            908
+          ],
+          "candidate_text": "y$_{i}$",
+          "tokens": [
+            "y",
+            "i"
+          ],
+          "signature": [
+            "y",
+            "<sub>",
+            "i",
+            "</sub>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1339,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1338
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "y",
+        "i"
+      ],
+      "source_signature": [
+        "y",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1339,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1338
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "y_{i}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "y",
+            "i"
+          ],
+          "proposal_signature": [
+            "y",
+            "<sub>",
+            "i",
+            "</sub>"
+          ]
+        }
+      ],
+      "proposal": "y_{i}",
+      "proposal_tokens": [
+        "y",
+        "i"
+      ],
+      "proposal_signature": [
+        "y",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "after": "$y_{i}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"970:977\" data-correction-id=\"pdf-source:1:1338\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>y</mi><mrow><mi>i</mi></mrow></msub></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        970,
+        977
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1506",
+      "kind": "render_normalization",
+      "region_ids": [
+        "pdf-source:1:1506"
+      ],
+      "region_id": "pdf-source:1:1506",
+      "page": 1,
+      "docling_ref": "#/texts/8",
+      "charspan": [
+        1125,
+        1132
+      ],
+      "before": "y$_{i}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1506",
+          "candidate_charspan": [
+            1125,
+            1132
+          ],
+          "candidate_text": "y$_{i}$",
+          "tokens": [
+            "y",
+            "i"
+          ],
+          "signature": [
+            "y",
+            "<sub>",
+            "i",
+            "</sub>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1507,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1506
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "y",
+        "i"
+      ],
+      "source_signature": [
+        "y",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1507,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1506
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "y_{i}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "y",
+            "i"
+          ],
+          "proposal_signature": [
+            "y",
+            "<sub>",
+            "i",
+            "</sub>"
+          ]
+        }
+      ],
+      "proposal": "y_{i}",
+      "proposal_tokens": [
+        "y",
+        "i"
+      ],
+      "proposal_signature": [
+        "y",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "after": "$y_{i}$",
+      "mathml": "<math data-docling-ref=\"#/texts/8\" data-docling-charspan=\"1194:1201\" data-correction-id=\"pdf-source:1:1506\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>y</mi><mrow><mi>i</mi></mrow></msub></mrow></math>",
+      "derived_docling_ref": "#/texts/8",
+      "derived_charspan": [
+        1194,
+        1201
+      ]
+    },
+    {
+      "target_id": "pdf-source:1:1804",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:1:1804"
+      ],
+      "region_id": "pdf-source:1:1804",
+      "page": 1,
+      "docling_ref": "#/texts/9",
+      "charspan": [
+        113,
+        114
+      ],
+      "before": "x",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:1:1804",
+          "candidate_charspan": [
+            113,
+            114
+          ],
+          "candidate_text": "x",
+          "tokens": [
+            "x"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "x"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}",
+      "proposal_tokens": [
+        "x"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "after": "$\\mathbf{x}$",
+      "mathml": "<math data-docling-ref=\"#/texts/9\" data-docling-charspan=\"113:125\" data-correction-id=\"pdf-source:1:1804\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>&#x1D431;</mi></mrow></math>",
+      "derived_docling_ref": "#/texts/9",
+      "derived_charspan": [
+        113,
+        125
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:376",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:376"
+      ],
+      "region_id": "pdf-source:2:376",
+      "page": 2,
+      "docling_ref": "#/texts/15",
+      "charspan": [
+        80,
+        81
+      ],
+      "before": "w",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:376",
+          "candidate_charspan": [
+            80,
+            81
+          ],
+          "candidate_text": "w",
+          "tokens": [
+            "w"
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "</bold>"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "w"
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "</bold>"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{w}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "w"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "w",
+            "</bold>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{w}",
+      "proposal_tokens": [
+        "w"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "w",
+        "</bold>"
+      ],
+      "after": "$\\mathbf{w}$",
+      "mathml": "<math data-docling-ref=\"#/texts/15\" data-docling-charspan=\"80:92\" data-correction-id=\"pdf-source:2:376\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>&#x1D430;</mi></mrow></math>",
+      "derived_docling_ref": "#/texts/15",
+      "derived_charspan": [
+        80,
+        92
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:423",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:423"
+      ],
+      "region_id": "pdf-source:2:423",
+      "page": 2,
+      "docling_ref": "#/texts/15",
+      "charspan": [
+        137,
+        138
+      ],
+      "before": "x",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:423",
+          "candidate_charspan": [
+            137,
+            138
+          ],
+          "candidate_text": "x",
+          "tokens": [
+            "x"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "x"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}",
+      "proposal_tokens": [
+        "x"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "after": "$\\mathbf{x}$",
+      "mathml": "<math data-docling-ref=\"#/texts/15\" data-docling-charspan=\"148:160\" data-correction-id=\"pdf-source:2:423\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>&#x1D431;</mi></mrow></math>",
+      "derived_docling_ref": "#/texts/15",
+      "derived_charspan": [
+        148,
+        160
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:449",
+      "kind": "formula_replacement",
+      "region_ids": [
+        "pdf-source:2:449"
+      ],
+      "region_id": "pdf-source:2:449",
+      "page": 2,
+      "docling_ref": "#/texts/16",
+      "charspan": [
+        0,
+        13
+      ],
+      "before": "w x - b = 0 ,",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:449",
+          "candidate_charspan": [
+            0,
+            13
+          ],
+          "candidate_text": "w x - b = 0 ,",
+          "tokens": [
+            "w",
+            "x",
+            "−",
+            "b",
+            "=",
+            "0",
+            ","
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "x",
+            "</bold>",
+            "−",
+            "b",
+            "=",
+            "0",
+            ","
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "w",
+        "x",
+        "−",
+        "b",
+        "=",
+        "0",
+        ","
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "x",
+        "</bold>",
+        "−",
+        "b",
+        "=",
+        "0",
+        ","
+      ],
+      "source_relations": [],
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{w x} - b = 0 ,",
+          "deterministic_rejection_reason": null,
+          "crop_bbox": [
+            244.0679931640625,
+            154.37335205078125,
+            295.9346008300781,
+            167.80947875976562
+          ],
+          "crop_sha256": "f50c93c3cebb82ccdfcda6af3b9839093cfc1b772448d664e095cbc8ad452da3",
+          "prompt": "Transcribe only the mathematical expression in this crop as valid LaTeX. Return raw LaTeX without dollar delimiters, prose, or code fence. Preserve all braces, indices, exponents, symbols, and their relations.",
+          "model": "google/gemma-4-26B-A4B-it",
+          "vision_proposal": "\\mathbf{WX}-b=0,",
+          "vision_proposal_tokens": [
+            "W",
+            "X",
+            "−",
+            "b",
+            "=",
+            "0",
+            ","
+          ],
+          "vision_proposal_signature": [
+            "<bold>",
+            "W",
+            "X",
+            "</bold>",
+            "−",
+            "b",
+            "=",
+            "0",
+            ","
+          ],
+          "vision_confirmation": null
+        }
+      ],
+      "proposal": "\\mathbf{WX}-b=0,",
+      "proposal_tokens": [
+        "W",
+        "X",
+        "−",
+        "b",
+        "=",
+        "0",
+        ","
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "W",
+        "X",
+        "</bold>",
+        "−",
+        "b",
+        "=",
+        "0",
+        ","
+      ],
+      "status": "rejected",
+      "reason": "vision_confirmation_not_proven_by_source"
+    },
+    {
+      "target_id": "pdf-source:2:474",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:474"
+      ],
+      "region_id": "pdf-source:2:474",
+      "page": 2,
+      "docling_ref": "#/texts/17",
+      "charspan": [
+        21,
+        23
+      ],
+      "before": "wx",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:474",
+          "candidate_charspan": [
+            21,
+            23
+          ],
+          "candidate_text": "wx",
+          "tokens": [
+            "w",
+            "x"
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "x",
+            "</bold>"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "w",
+        "x"
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "x",
+        "</bold>"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{w x}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "w",
+            "x"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "w",
+            "x",
+            "</bold>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{w x}",
+      "proposal_tokens": [
+        "w",
+        "x"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "w",
+        "x",
+        "</bold>"
+      ],
+      "after": "$\\mathbf{w x}$",
+      "mathml": "<math data-docling-ref=\"#/texts/17\" data-docling-charspan=\"21:35\" data-correction-id=\"pdf-source:2:474\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mrow><mi mathvariant=\"bold\">w</mi><mi mathvariant=\"bold\">x</mi></mrow></mrow></math>",
+      "derived_docling_ref": "#/texts/17",
+      "derived_charspan": [
+        21,
+        35
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:481",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:481"
+      ],
+      "region_id": "pdf-source:2:481",
+      "page": 2,
+      "docling_ref": "#/texts/17",
+      "charspan": [
+        30,
+        75
+      ],
+      "before": "w (1) x (1) + w (2) x (2) + ... + w (D) x (D)",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:481",
+          "candidate_charspan": [
+            30,
+            75
+          ],
+          "candidate_text": "w (1) x (1) + w (2) x (2) + ... + w (D) x (D)",
+          "tokens": [
+            "w",
+            "(",
+            "1",
+            ")",
+            "x",
+            "(",
+            "1",
+            ")",
+            "+",
+            "w",
+            "(",
+            "2",
+            ")",
+            "x",
+            "(",
+            "2",
+            ")",
+            "+",
+            ".",
+            ".",
+            ".",
+            "+",
+            "w",
+            "(",
+            "D",
+            ")",
+            "x",
+            "(",
+            "D",
+            ")"
+          ],
+          "signature": [
+            "w",
+            "<sup>",
+            "(",
+            "1",
+            ")",
+            "</sup>",
+            "x",
+            "<sup>",
+            "(",
+            "1",
+            ")",
+            "</sup>",
+            "+",
+            "w",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>",
+            "x",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>",
+            "+",
+            ".",
+            ".",
+            ".",
+            "+",
+            "w",
+            "<sup>",
+            "(",
+            "D",
+            ")",
+            "</sup>",
+            "x",
+            "<sup>",
+            "(",
+            "D",
+            ")",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 482,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 481
+            },
+            {
+              "sequence_index": 483,
+              "token": "1",
+              "role": "superscript",
+              "anchor_sequence_index": 481
+            },
+            {
+              "sequence_index": 484,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 481
+            },
+            {
+              "sequence_index": 486,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 485
+            },
+            {
+              "sequence_index": 487,
+              "token": "1",
+              "role": "superscript",
+              "anchor_sequence_index": 485
+            },
+            {
+              "sequence_index": 488,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 485
+            },
+            {
+              "sequence_index": 491,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 490
+            },
+            {
+              "sequence_index": 492,
+              "token": "2",
+              "role": "superscript",
+              "anchor_sequence_index": 490
+            },
+            {
+              "sequence_index": 493,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 490
+            },
+            {
+              "sequence_index": 495,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 494
+            },
+            {
+              "sequence_index": 496,
+              "token": "2",
+              "role": "superscript",
+              "anchor_sequence_index": 494
+            },
+            {
+              "sequence_index": 497,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 494
+            },
+            {
+              "sequence_index": 504,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 503
+            },
+            {
+              "sequence_index": 505,
+              "token": "D",
+              "role": "superscript",
+              "anchor_sequence_index": 503
+            },
+            {
+              "sequence_index": 506,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 503
+            },
+            {
+              "sequence_index": 508,
+              "token": "(",
+              "role": "superscript",
+              "anchor_sequence_index": 507
+            },
+            {
+              "sequence_index": 509,
+              "token": "D",
+              "role": "superscript",
+              "anchor_sequence_index": 507
+            },
+            {
+              "sequence_index": 510,
+              "token": ")",
+              "role": "superscript",
+              "anchor_sequence_index": 507
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "w",
+        "(",
+        "1",
+        ")",
+        "x",
+        "(",
+        "1",
+        ")",
+        "+",
+        "w",
+        "(",
+        "2",
+        ")",
+        "x",
+        "(",
+        "2",
+        ")",
+        "+",
+        ".",
+        ".",
+        ".",
+        "+",
+        "w",
+        "(",
+        "D",
+        ")",
+        "x",
+        "(",
+        "D",
+        ")"
+      ],
+      "source_signature": [
+        "w",
+        "<sup>",
+        "(",
+        "1",
+        ")",
+        "</sup>",
+        "x",
+        "<sup>",
+        "(",
+        "1",
+        ")",
+        "</sup>",
+        "+",
+        "w",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>",
+        "x",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>",
+        "+",
+        ".",
+        ".",
+        ".",
+        "+",
+        "w",
+        "<sup>",
+        "(",
+        "D",
+        ")",
+        "</sup>",
+        "x",
+        "<sup>",
+        "(",
+        "D",
+        ")",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 482,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 481
+        },
+        {
+          "sequence_index": 483,
+          "token": "1",
+          "role": "superscript",
+          "anchor_sequence_index": 481
+        },
+        {
+          "sequence_index": 484,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 481
+        },
+        {
+          "sequence_index": 486,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 485
+        },
+        {
+          "sequence_index": 487,
+          "token": "1",
+          "role": "superscript",
+          "anchor_sequence_index": 485
+        },
+        {
+          "sequence_index": 488,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 485
+        },
+        {
+          "sequence_index": 491,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 490
+        },
+        {
+          "sequence_index": 492,
+          "token": "2",
+          "role": "superscript",
+          "anchor_sequence_index": 490
+        },
+        {
+          "sequence_index": 493,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 490
+        },
+        {
+          "sequence_index": 495,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 494
+        },
+        {
+          "sequence_index": 496,
+          "token": "2",
+          "role": "superscript",
+          "anchor_sequence_index": 494
+        },
+        {
+          "sequence_index": 497,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 494
+        },
+        {
+          "sequence_index": 504,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 503
+        },
+        {
+          "sequence_index": 505,
+          "token": "D",
+          "role": "superscript",
+          "anchor_sequence_index": 503
+        },
+        {
+          "sequence_index": 506,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 503
+        },
+        {
+          "sequence_index": 508,
+          "token": "(",
+          "role": "superscript",
+          "anchor_sequence_index": 507
+        },
+        {
+          "sequence_index": 509,
+          "token": "D",
+          "role": "superscript",
+          "anchor_sequence_index": 507
+        },
+        {
+          "sequence_index": 510,
+          "token": ")",
+          "role": "superscript",
+          "anchor_sequence_index": 507
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "w^{( 1 )} x^{( 1 )} + w^{( 2 )} x^{( 2 )} + . . . + w^{( D )} x^{( D )}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "w",
+            "(",
+            "1",
+            ")",
+            "x",
+            "(",
+            "1",
+            ")",
+            "+",
+            "w",
+            "(",
+            "2",
+            ")",
+            "x",
+            "(",
+            "2",
+            ")",
+            "+",
+            ".",
+            ".",
+            ".",
+            "+",
+            "w",
+            "(",
+            "D",
+            ")",
+            "x",
+            "(",
+            "D",
+            ")"
+          ],
+          "proposal_signature": [
+            "w",
+            "<sup>",
+            "(",
+            "1",
+            ")",
+            "</sup>",
+            "x",
+            "<sup>",
+            "(",
+            "1",
+            ")",
+            "</sup>",
+            "+",
+            "w",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>",
+            "x",
+            "<sup>",
+            "(",
+            "2",
+            ")",
+            "</sup>",
+            "+",
+            ".",
+            ".",
+            ".",
+            "+",
+            "w",
+            "<sup>",
+            "(",
+            "D",
+            ")",
+            "</sup>",
+            "x",
+            "<sup>",
+            "(",
+            "D",
+            ")",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "w^{( 1 )} x^{( 1 )} + w^{( 2 )} x^{( 2 )} + . . . + w^{( D )} x^{( D )}",
+      "proposal_tokens": [
+        "w",
+        "(",
+        "1",
+        ")",
+        "x",
+        "(",
+        "1",
+        ")",
+        "+",
+        "w",
+        "(",
+        "2",
+        ")",
+        "x",
+        "(",
+        "2",
+        ")",
+        "+",
+        ".",
+        ".",
+        ".",
+        "+",
+        "w",
+        "(",
+        "D",
+        ")",
+        "x",
+        "(",
+        "D",
+        ")"
+      ],
+      "proposal_signature": [
+        "w",
+        "<sup>",
+        "(",
+        "1",
+        ")",
+        "</sup>",
+        "x",
+        "<sup>",
+        "(",
+        "1",
+        ")",
+        "</sup>",
+        "+",
+        "w",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>",
+        "x",
+        "<sup>",
+        "(",
+        "2",
+        ")",
+        "</sup>",
+        "+",
+        ".",
+        ".",
+        ".",
+        "+",
+        "w",
+        "<sup>",
+        "(",
+        "D",
+        ")",
+        "</sup>",
+        "x",
+        "<sup>",
+        "(",
+        "D",
+        ")",
+        "</sup>"
+      ],
+      "after": "$w^{( 1 )} x^{( 1 )} + w^{( 2 )} x^{( 2 )} + . . . + w^{( D )} x^{( D )}$",
+      "mathml": "<math data-docling-ref=\"#/texts/17\" data-docling-charspan=\"42:115\" data-correction-id=\"pdf-source:2:481\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>w</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>1</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msup><msup><mi>x</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>1</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msup><mo>&#x0002B;</mo><msup><mi>w</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>2</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msup><msup><mi>x</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mn>2</mn><mo stretchy=\"false\">&#x00029;</mo></mrow></msup><mo>&#x0002B;</mo><mo>&#x0002E;</mo><mo>&#x0002E;</mo><mo>&#x0002E;</mo><mo>&#x0002B;</mo><msup><mi>w</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mi>D</mi><mo stretchy=\"false\">&#x00029;</mo></mrow></msup><msup><mi>x</mi><mrow><mo stretchy=\"false\">&#x00028;</mo><mi>D</mi><mo stretchy=\"false\">&#x00029;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/17",
+      "derived_charspan": [
+        42,
+        115
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:557",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:557"
+      ],
+      "region_id": "pdf-source:2:557",
+      "page": 2,
+      "docling_ref": "#/texts/17",
+      "charspan": [
+        134,
+        135
+      ],
+      "before": "x",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:557",
+          "candidate_charspan": [
+            134,
+            135
+          ],
+          "candidate_text": "x",
+          "tokens": [
+            "x"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "x"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}",
+      "proposal_tokens": [
+        "x"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "after": "$\\mathbf{x}$",
+      "mathml": "<math data-docling-ref=\"#/texts/17\" data-docling-charspan=\"174:186\" data-correction-id=\"pdf-source:2:557\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>&#x1D431;</mi></mrow></math>",
+      "derived_docling_ref": "#/texts/17",
+      "derived_charspan": [
+        174,
+        186
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:823",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:823"
+      ],
+      "region_id": "pdf-source:2:823",
+      "page": 2,
+      "docling_ref": "#/texts/19",
+      "charspan": [
+        55,
+        56
+      ],
+      "before": "x",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:823",
+          "candidate_charspan": [
+            55,
+            56
+          ],
+          "candidate_text": "x",
+          "tokens": [
+            "x"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "x"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}",
+      "proposal_tokens": [
+        "x"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>"
+      ],
+      "after": "$\\mathbf{x}$",
+      "mathml": "<math data-docling-ref=\"#/texts/19\" data-docling-charspan=\"55:67\" data-correction-id=\"pdf-source:2:823\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>&#x1D431;</mi></mrow></math>",
+      "derived_docling_ref": "#/texts/19",
+      "derived_charspan": [
+        55,
+        67
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:840",
+      "kind": "formula_replacement",
+      "region_ids": [
+        "pdf-source:2:840"
+      ],
+      "region_id": "pdf-source:2:840",
+      "page": 2,
+      "docling_ref": "#/texts/20",
+      "charspan": [
+        0,
+        36
+      ],
+      "before": "y = \\text {sign} ( \\text {w} - b ) ,",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:840",
+          "candidate_charspan": [
+            0,
+            36
+          ],
+          "candidate_text": "y = \\text {sign} ( \\text {w} - b ) ,",
+          "tokens": [
+            "y",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "w",
+            "x",
+            "−",
+            "b",
+            ")",
+            ","
+          ],
+          "signature": [
+            "y",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "<bold>",
+            "w",
+            "x",
+            "</bold>",
+            "−",
+            "b",
+            ")",
+            ","
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "y",
+        "=",
+        "s",
+        "i",
+        "g",
+        "n",
+        "(",
+        "w",
+        "x",
+        "−",
+        "b",
+        ")",
+        ","
+      ],
+      "source_signature": [
+        "y",
+        "=",
+        "s",
+        "i",
+        "g",
+        "n",
+        "(",
+        "<bold>",
+        "w",
+        "x",
+        "</bold>",
+        "−",
+        "b",
+        ")",
+        ","
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "y = s i g n ( \\mathbf{w x} - b ) ,",
+          "deterministic_rejection_reason": "deterministic_text_grouping_unproven",
+          "crop_bbox": [
+            231.42100524902344,
+            279.90234375,
+            308.58160400390625,
+            293.3384704589844
+          ],
+          "crop_sha256": "3ca5698e138bc8c353013e22ed268f2106a2ef9a8f40e14a4d84c73fc972dbe6",
+          "prompt": "Transcribe only the mathematical expression in this crop as valid LaTeX. Return raw LaTeX without dollar delimiters, prose, or code fence. Preserve all braces, indices, exponents, symbols, and their relations.",
+          "model": "google/gemma-4-26B-A4B-it",
+          "vision_proposal": "y = \\text{sign}(\\mathbf{wx} - b),",
+          "vision_proposal_tokens": [
+            "y",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "w",
+            "x",
+            "−",
+            "b",
+            ")",
+            ","
+          ],
+          "vision_proposal_signature": [
+            "y",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "<bold>",
+            "w",
+            "x",
+            "</bold>",
+            "−",
+            "b",
+            ")",
+            ","
+          ],
+          "vision_confirmation": "exact",
+          "selected_engine": "vision_proven_by_source",
+          "proposal_tokens": [
+            "y",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "w",
+            "x",
+            "−",
+            "b",
+            ")",
+            ","
+          ],
+          "proposal_signature": [
+            "y",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "<bold>",
+            "w",
+            "x",
+            "</bold>",
+            "−",
+            "b",
+            ")",
+            ","
+          ]
+        }
+      ],
+      "proposal": "y = \\text{sign}(\\mathbf{wx} - b),",
+      "proposal_tokens": [
+        "y",
+        "=",
+        "s",
+        "i",
+        "g",
+        "n",
+        "(",
+        "w",
+        "x",
+        "−",
+        "b",
+        ")",
+        ","
+      ],
+      "proposal_signature": [
+        "y",
+        "=",
+        "s",
+        "i",
+        "g",
+        "n",
+        "(",
+        "<bold>",
+        "w",
+        "x",
+        "</bold>",
+        "−",
+        "b",
+        ")",
+        ","
+      ],
+      "after": "y = \\text{sign}(\\mathbf{wx} - b),",
+      "mathml": "<math data-docling-ref=\"#/texts/20\" data-docling-charspan=\"0:33\" data-correction-id=\"pdf-source:2:840\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mi>y</mi><mo>&#x0003D;</mo><mtext>sign</mtext><mo stretchy=\"false\">&#x00028;</mo><mrow><mi mathvariant=\"bold\">w</mi><mi mathvariant=\"bold\">x</mi></mrow><mo>&#x02212;</mo><mi>b</mi><mo stretchy=\"false\">&#x00029;</mo><mo>&#x0002C;</mo></mrow></math>",
+      "derived_docling_ref": "#/texts/20",
+      "derived_charspan": [
+        0,
+        33
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1068",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1068"
+      ],
+      "region_id": "pdf-source:2:1068",
+      "page": 2,
+      "docling_ref": "#/texts/22",
+      "charspan": [
+        107,
+        110
+      ],
+      "before": "w ∗",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1068",
+          "candidate_charspan": [
+            107,
+            110
+          ],
+          "candidate_text": "w ∗",
+          "tokens": [
+            "w",
+            "∗"
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1069,
+              "token": "∗",
+              "role": "superscript",
+              "anchor_sequence_index": 1068
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "w",
+        "∗"
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "</bold>",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1069,
+          "token": "∗",
+          "role": "superscript",
+          "anchor_sequence_index": 1068
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{w}^{*}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "w",
+            "∗"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{w}^{*}",
+      "proposal_tokens": [
+        "w",
+        "∗"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "w",
+        "</bold>",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "after": "$\\mathbf{w}^{*}$",
+      "mathml": "<math data-docling-ref=\"#/texts/22\" data-docling-charspan=\"107:123\" data-correction-id=\"pdf-source:2:1068\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>&#x1D430;</mi><mrow><mo>&#x0002A;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/22",
+      "derived_charspan": [
+        107,
+        123
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1073",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1073"
+      ],
+      "region_id": "pdf-source:2:1073",
+      "page": 2,
+      "docling_ref": "#/texts/22",
+      "charspan": [
+        115,
+        118
+      ],
+      "before": "b ∗",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1073",
+          "candidate_charspan": [
+            115,
+            118
+          ],
+          "candidate_text": "b ∗",
+          "tokens": [
+            "b",
+            "∗"
+          ],
+          "signature": [
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1074,
+              "token": "∗",
+              "role": "superscript",
+              "anchor_sequence_index": 1073
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "b",
+        "∗"
+      ],
+      "source_signature": [
+        "b",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1074,
+          "token": "∗",
+          "role": "superscript",
+          "anchor_sequence_index": 1073
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "b^{*}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "b",
+            "∗"
+          ],
+          "proposal_signature": [
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "b^{*}",
+      "proposal_tokens": [
+        "b",
+        "∗"
+      ],
+      "proposal_signature": [
+        "b",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "after": "$b^{*}$",
+      "mathml": "<math data-docling-ref=\"#/texts/22\" data-docling-charspan=\"128:135\" data-correction-id=\"pdf-source:2:1073\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>b</mi><mrow><mo>&#x0002A;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/22",
+      "derived_charspan": [
+        128,
+        135
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1088",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1088"
+      ],
+      "region_id": "pdf-source:2:1088",
+      "page": 2,
+      "docling_ref": "#/texts/22",
+      "charspan": [
+        134,
+        135
+      ],
+      "before": "w",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1088",
+          "candidate_charspan": [
+            134,
+            135
+          ],
+          "candidate_text": "w",
+          "tokens": [
+            "w"
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "</bold>"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "w"
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "</bold>"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{w}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "w"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "w",
+            "</bold>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{w}",
+      "proposal_tokens": [
+        "w"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "w",
+        "</bold>"
+      ],
+      "after": "$\\mathbf{w}$",
+      "mathml": "<math data-docling-ref=\"#/texts/22\" data-docling-charspan=\"151:163\" data-correction-id=\"pdf-source:2:1088\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>&#x1D430;</mi></mrow></math>",
+      "derived_docling_ref": "#/texts/22",
+      "derived_charspan": [
+        151,
+        163
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1154",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1154"
+      ],
+      "region_id": "pdf-source:2:1154",
+      "page": 2,
+      "docling_ref": "#/texts/22",
+      "charspan": [
+        215,
+        222
+      ],
+      "before": "f ( x )",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1154",
+          "candidate_charspan": [
+            215,
+            222
+          ],
+          "candidate_text": "f ( x )",
+          "tokens": [
+            "f",
+            "(",
+            "x",
+            ")"
+          ],
+          "signature": [
+            "f",
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            ")"
+          ],
+          "relations": []
+        }
+      ],
+      "source_tokens": [
+        "f",
+        "(",
+        "x",
+        ")"
+      ],
+      "source_signature": [
+        "f",
+        "(",
+        "<bold>",
+        "x",
+        "</bold>",
+        ")"
+      ],
+      "source_relations": [],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "f ( \\mathbf{x} )",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "f",
+            "(",
+            "x",
+            ")"
+          ],
+          "proposal_signature": [
+            "f",
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            ")"
+          ]
+        }
+      ],
+      "proposal": "f ( \\mathbf{x} )",
+      "proposal_tokens": [
+        "f",
+        "(",
+        "x",
+        ")"
+      ],
+      "proposal_signature": [
+        "f",
+        "(",
+        "<bold>",
+        "x",
+        "</bold>",
+        ")"
+      ],
+      "after": "$f ( \\mathbf{x} )$",
+      "mathml": "<math data-docling-ref=\"#/texts/22\" data-docling-charspan=\"243:261\" data-correction-id=\"pdf-source:2:1154\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>f</mi><mo stretchy=\"false\">&#x00028;</mo><mi>&#x1D431;</mi><mo stretchy=\"false\">&#x00029;</mo></mrow></math>",
+      "derived_docling_ref": "#/texts/22",
+      "derived_charspan": [
+        243,
+        261
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1173",
+      "kind": "formula_replacement",
+      "region_ids": [
+        "pdf-source:2:1173"
+      ],
+      "region_id": "pdf-source:2:1173",
+      "page": 2,
+      "docling_ref": "#/texts/23",
+      "charspan": [
+        0,
+        50
+      ],
+      "before": "f ( x ) = \\text {sign} ( w ^ { * } x - b ^ { * } )",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1173",
+          "candidate_charspan": [
+            0,
+            50
+          ],
+          "candidate_text": "f ( x ) = \\text {sign} ( w ^ { * } x - b ^ { * } )",
+          "tokens": [
+            "f",
+            "(",
+            "x",
+            ")",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "w",
+            "∗",
+            "x",
+            "−",
+            "b",
+            "∗",
+            ")"
+          ],
+          "signature": [
+            "f",
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            ")",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>",
+            "<bold>",
+            "x",
+            "</bold>",
+            "−",
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>",
+            ")"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1184,
+              "token": "∗",
+              "role": "superscript",
+              "anchor_sequence_index": 1183
+            },
+            {
+              "sequence_index": 1188,
+              "token": "∗",
+              "role": "superscript",
+              "anchor_sequence_index": 1187
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "f",
+        "(",
+        "x",
+        ")",
+        "=",
+        "s",
+        "i",
+        "g",
+        "n",
+        "(",
+        "w",
+        "∗",
+        "x",
+        "−",
+        "b",
+        "∗",
+        ")"
+      ],
+      "source_signature": [
+        "f",
+        "(",
+        "<bold>",
+        "x",
+        "</bold>",
+        ")",
+        "=",
+        "s",
+        "i",
+        "g",
+        "n",
+        "(",
+        "<bold>",
+        "w",
+        "</bold>",
+        "<sup>",
+        "∗",
+        "</sup>",
+        "<bold>",
+        "x",
+        "</bold>",
+        "−",
+        "b",
+        "<sup>",
+        "∗",
+        "</sup>",
+        ")"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1184,
+          "token": "∗",
+          "role": "superscript",
+          "anchor_sequence_index": 1183
+        },
+        {
+          "sequence_index": 1188,
+          "token": "∗",
+          "role": "superscript",
+          "anchor_sequence_index": 1187
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "f ( \\mathbf{x} ) = s i g n ( \\mathbf{w}^{*} \\mathbf{x} - b^{*} )",
+          "deterministic_rejection_reason": "deterministic_text_grouping_unproven",
+          "crop_bbox": [
+            220.9320068359375,
+            387.4993591308594,
+            319.0684509277344,
+            400.93548583984375
+          ],
+          "crop_sha256": "5078f9be22b6c66ce5c806b1303023e479c13132547b5ad5c0c9a73b7a33a27e",
+          "prompt": "Transcribe only the mathematical expression in this crop as valid LaTeX. Return raw LaTeX without dollar delimiters, prose, or code fence. Preserve all braces, indices, exponents, symbols, and their relations.",
+          "model": "google/gemma-4-26B-A4B-it",
+          "vision_proposal": "f(\\mathbf{x}) = \\text{sign}(\\mathbf{w}^*\\mathbf{x} - b^*)",
+          "vision_proposal_tokens": [
+            "f",
+            "(",
+            "x",
+            ")",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "w",
+            "∗",
+            "x",
+            "−",
+            "b",
+            "∗",
+            ")"
+          ],
+          "vision_proposal_signature": [
+            "f",
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            ")",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>",
+            "<bold>",
+            "x",
+            "</bold>",
+            "−",
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>",
+            ")"
+          ],
+          "vision_confirmation": "exact",
+          "selected_engine": "vision_proven_by_source",
+          "proposal_tokens": [
+            "f",
+            "(",
+            "x",
+            ")",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "w",
+            "∗",
+            "x",
+            "−",
+            "b",
+            "∗",
+            ")"
+          ],
+          "proposal_signature": [
+            "f",
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            ")",
+            "=",
+            "s",
+            "i",
+            "g",
+            "n",
+            "(",
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>",
+            "<bold>",
+            "x",
+            "</bold>",
+            "−",
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>",
+            ")"
+          ]
+        }
+      ],
+      "proposal": "f(\\mathbf{x}) = \\text{sign}(\\mathbf{w}^*\\mathbf{x} - b^*)",
+      "proposal_tokens": [
+        "f",
+        "(",
+        "x",
+        ")",
+        "=",
+        "s",
+        "i",
+        "g",
+        "n",
+        "(",
+        "w",
+        "∗",
+        "x",
+        "−",
+        "b",
+        "∗",
+        ")"
+      ],
+      "proposal_signature": [
+        "f",
+        "(",
+        "<bold>",
+        "x",
+        "</bold>",
+        ")",
+        "=",
+        "s",
+        "i",
+        "g",
+        "n",
+        "(",
+        "<bold>",
+        "w",
+        "</bold>",
+        "<sup>",
+        "∗",
+        "</sup>",
+        "<bold>",
+        "x",
+        "</bold>",
+        "−",
+        "b",
+        "<sup>",
+        "∗",
+        "</sup>",
+        ")"
+      ],
+      "after": "f(\\mathbf{x}) = \\text{sign}(\\mathbf{w}^*\\mathbf{x} - b^*)",
+      "mathml": "<math data-docling-ref=\"#/texts/23\" data-docling-charspan=\"0:57\" data-correction-id=\"pdf-source:2:1173\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mi>f</mi><mo stretchy=\"false\">&#x00028;</mo><mi>&#x1D431;</mi><mo stretchy=\"false\">&#x00029;</mo><mo>&#x0003D;</mo><mtext>sign</mtext><mo stretchy=\"false\">&#x00028;</mo><msup><mi>&#x1D430;</mi><mo>&#x0002A;</mo></msup><mi>&#x1D431;</mi><mo>&#x02212;</mo><msup><mi>b</mi><mo>&#x0002A;</mo></msup><mo stretchy=\"false\">&#x00029;</mo></mrow></math>",
+      "derived_docling_ref": "#/texts/23",
+      "derived_charspan": [
+        0,
+        57
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1344",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1344"
+      ],
+      "region_id": "pdf-source:2:1344",
+      "page": 2,
+      "docling_ref": "#/texts/24",
+      "charspan": [
+        190,
+        198
+      ],
+      "before": "w $^{∗}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1344",
+          "candidate_charspan": [
+            190,
+            198
+          ],
+          "candidate_text": "w $^{∗}$",
+          "tokens": [
+            "w",
+            "∗"
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1345,
+              "token": "∗",
+              "role": "superscript",
+              "anchor_sequence_index": 1344
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "w",
+        "∗"
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "</bold>",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1345,
+          "token": "∗",
+          "role": "superscript",
+          "anchor_sequence_index": 1344
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{w}^{*}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "w",
+            "∗"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{w}^{*}",
+      "proposal_tokens": [
+        "w",
+        "∗"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "w",
+        "</bold>",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "after": "$\\mathbf{w}^{*}$",
+      "mathml": "<math data-docling-ref=\"#/texts/24\" data-docling-charspan=\"190:206\" data-correction-id=\"pdf-source:2:1344\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>&#x1D430;</mi><mrow><mo>&#x0002A;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/24",
+      "derived_charspan": [
+        190,
+        206
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1355",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1355"
+      ],
+      "region_id": "pdf-source:2:1355",
+      "page": 2,
+      "docling_ref": "#/texts/24",
+      "charspan": [
+        209,
+        212
+      ],
+      "before": "b ∗",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1355",
+          "candidate_charspan": [
+            209,
+            212
+          ],
+          "candidate_text": "b ∗",
+          "tokens": [
+            "b",
+            "∗"
+          ],
+          "signature": [
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1356,
+              "token": "∗",
+              "role": "superscript",
+              "anchor_sequence_index": 1355
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "b",
+        "∗"
+      ],
+      "source_signature": [
+        "b",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1356,
+          "token": "∗",
+          "role": "superscript",
+          "anchor_sequence_index": 1355
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "b^{*}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "b",
+            "∗"
+          ],
+          "proposal_signature": [
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "b^{*}",
+      "proposal_tokens": [
+        "b",
+        "∗"
+      ],
+      "proposal_signature": [
+        "b",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "after": "$b^{*}$",
+      "mathml": "<math data-docling-ref=\"#/texts/24\" data-docling-charspan=\"217:224\" data-correction-id=\"pdf-source:2:1355\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>b</mi><mrow><mo>&#x0002A;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/24",
+      "derived_charspan": [
+        217,
+        224
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1468",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1468"
+      ],
+      "region_id": "pdf-source:2:1468",
+      "page": 2,
+      "docling_ref": "#/texts/25",
+      "charspan": [
+        31,
+        34
+      ],
+      "before": "w ∗",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1468",
+          "candidate_charspan": [
+            31,
+            34
+          ],
+          "candidate_text": "w ∗",
+          "tokens": [
+            "w",
+            "∗"
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1469,
+              "token": "∗",
+              "role": "superscript",
+              "anchor_sequence_index": 1468
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "w",
+        "∗"
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "</bold>",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1469,
+          "token": "∗",
+          "role": "superscript",
+          "anchor_sequence_index": 1468
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{w}^{*}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "w",
+            "∗"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "w",
+            "</bold>",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{w}^{*}",
+      "proposal_tokens": [
+        "w",
+        "∗"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "w",
+        "</bold>",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "after": "$\\mathbf{w}^{*}$",
+      "mathml": "<math data-docling-ref=\"#/texts/25\" data-docling-charspan=\"31:47\" data-correction-id=\"pdf-source:2:1468\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>&#x1D430;</mi><mrow><mo>&#x0002A;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/25",
+      "derived_charspan": [
+        31,
+        47
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1473",
+      "kind": "render_normalization",
+      "region_ids": [
+        "pdf-source:2:1473"
+      ],
+      "region_id": "pdf-source:2:1473",
+      "page": 2,
+      "docling_ref": "#/texts/25",
+      "charspan": [
+        39,
+        47
+      ],
+      "before": "b $^{∗}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1473",
+          "candidate_charspan": [
+            39,
+            47
+          ],
+          "candidate_text": "b $^{∗}$",
+          "tokens": [
+            "b",
+            "∗"
+          ],
+          "signature": [
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1474,
+              "token": "∗",
+              "role": "superscript",
+              "anchor_sequence_index": 1473
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "b",
+        "∗"
+      ],
+      "source_signature": [
+        "b",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1474,
+          "token": "∗",
+          "role": "superscript",
+          "anchor_sequence_index": 1473
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "b^{*}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "b",
+            "∗"
+          ],
+          "proposal_signature": [
+            "b",
+            "<sup>",
+            "∗",
+            "</sup>"
+          ]
+        }
+      ],
+      "proposal": "b^{*}",
+      "proposal_tokens": [
+        "b",
+        "∗"
+      ],
+      "proposal_signature": [
+        "b",
+        "<sup>",
+        "∗",
+        "</sup>"
+      ],
+      "after": "$b^{*}$",
+      "mathml": "<math data-docling-ref=\"#/texts/25\" data-docling-charspan=\"52:59\" data-correction-id=\"pdf-source:2:1473\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msup><mi>b</mi><mrow><mo>&#x0002A;</mo></mrow></msup></mrow></math>",
+      "derived_docling_ref": "#/texts/25",
+      "derived_charspan": [
+        52,
+        59
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1724",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1724"
+      ],
+      "region_id": "pdf-source:2:1724",
+      "page": 2,
+      "docling_ref": "#/texts/26",
+      "charspan": [
+        209,
+        230
+      ],
+      "before": "( x$_{i}$ , y$_{i}$ )",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1724",
+          "candidate_charspan": [
+            209,
+            230
+          ],
+          "candidate_text": "( x$_{i}$ , y$_{i}$ )",
+          "tokens": [
+            "(",
+            "x",
+            "i",
+            ",",
+            "y",
+            "i",
+            ")"
+          ],
+          "signature": [
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>",
+            ",",
+            "y",
+            "<sub>",
+            "i",
+            "</sub>",
+            ")"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1726,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1725
+            },
+            {
+              "sequence_index": 1729,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1728
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "(",
+        "x",
+        "i",
+        ",",
+        "y",
+        "i",
+        ")"
+      ],
+      "source_signature": [
+        "(",
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>",
+        ",",
+        "y",
+        "<sub>",
+        "i",
+        "</sub>",
+        ")"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1726,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1725
+        },
+        {
+          "sequence_index": 1729,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1728
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "( \\mathbf{x}_{i} , y_{i} )",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "(",
+            "x",
+            "i",
+            ",",
+            "y",
+            "i",
+            ")"
+          ],
+          "proposal_signature": [
+            "(",
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>",
+            ",",
+            "y",
+            "<sub>",
+            "i",
+            "</sub>",
+            ")"
+          ]
+        }
+      ],
+      "proposal": "( \\mathbf{x}_{i} , y_{i} )",
+      "proposal_tokens": [
+        "(",
+        "x",
+        "i",
+        ",",
+        "y",
+        "i",
+        ")"
+      ],
+      "proposal_signature": [
+        "(",
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>",
+        ",",
+        "y",
+        "<sub>",
+        "i",
+        "</sub>",
+        ")"
+      ],
+      "after": "$( \\mathbf{x}_{i} , y_{i} )$",
+      "mathml": "<math data-docling-ref=\"#/texts/26\" data-docling-charspan=\"209:237\" data-correction-id=\"pdf-source:2:1724\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mo stretchy=\"false\">&#x00028;</mo><msub><mi>&#x1D431;</mi><mrow><mi>i</mi></mrow></msub><mo>&#x0002C;</mo><msub><mi>y</mi><mrow><mi>i</mi></mrow></msub><mo stretchy=\"false\">&#x00029;</mo></mrow></math>",
+      "derived_docling_ref": "#/texts/26",
+      "derived_charspan": [
+        209,
+        237
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1737",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1737"
+      ],
+      "region_id": "pdf-source:2:1737",
+      "page": 2,
+      "docling_ref": "#/texts/26",
+      "charspan": [
+        238,
+        245
+      ],
+      "before": "x$_{i}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1737",
+          "candidate_charspan": [
+            238,
+            245
+          ],
+          "candidate_text": "x$_{i}$",
+          "tokens": [
+            "x",
+            "i"
+          ],
+          "signature": [
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1738,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1737
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "x",
+        "i"
+      ],
+      "source_signature": [
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1738,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1737
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "\\mathbf{x}_{i}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "x",
+            "i"
+          ],
+          "proposal_signature": [
+            "<bold>",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>"
+          ]
+        }
+      ],
+      "proposal": "\\mathbf{x}_{i}",
+      "proposal_tokens": [
+        "x",
+        "i"
+      ],
+      "proposal_signature": [
+        "<bold>",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "after": "$\\mathbf{x}_{i}$",
+      "mathml": "<math data-docling-ref=\"#/texts/26\" data-docling-charspan=\"245:261\" data-correction-id=\"pdf-source:2:1737\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>&#x1D431;</mi><mrow><mi>i</mi></mrow></msub></mrow></math>",
+      "derived_docling_ref": "#/texts/26",
+      "derived_charspan": [
+        245,
+        261
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1770",
+      "kind": "render_normalization",
+      "region_ids": [
+        "pdf-source:2:1770"
+      ],
+      "region_id": "pdf-source:2:1770",
+      "page": 2,
+      "docling_ref": "#/texts/26",
+      "charspan": [
+        285,
+        292
+      ],
+      "before": "y$_{i}$",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1770",
+          "candidate_charspan": [
+            285,
+            292
+          ],
+          "candidate_text": "y$_{i}$",
+          "tokens": [
+            "y",
+            "i"
+          ],
+          "signature": [
+            "y",
+            "<sub>",
+            "i",
+            "</sub>"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1771,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1770
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "y",
+        "i"
+      ],
+      "source_signature": [
+        "y",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1771,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1770
+        }
+      ],
+      "status": "accepted",
+      "proposals": [
+        {
+          "deterministic_proposal": "y_{i}",
+          "deterministic_rejection_reason": null,
+          "selected_engine": "deterministic_source",
+          "proposal_tokens": [
+            "y",
+            "i"
+          ],
+          "proposal_signature": [
+            "y",
+            "<sub>",
+            "i",
+            "</sub>"
+          ]
+        }
+      ],
+      "proposal": "y_{i}",
+      "proposal_tokens": [
+        "y",
+        "i"
+      ],
+      "proposal_signature": [
+        "y",
+        "<sub>",
+        "i",
+        "</sub>"
+      ],
+      "after": "$y_{i}$",
+      "mathml": "<math data-docling-ref=\"#/texts/26\" data-docling-charspan=\"301:308\" data-correction-id=\"pdf-source:2:1770\" xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>y</mi><mrow><mi>i</mi></mrow></msub></mrow></math>",
+      "derived_docling_ref": "#/texts/26",
+      "derived_charspan": [
+        301,
+        308
+      ]
+    },
+    {
+      "target_id": "pdf-source:2:1840",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1840"
+      ],
+      "region_id": "pdf-source:2:1840",
+      "page": 2,
+      "docling_ref": "#/texts/27",
+      "charspan": [
+        2,
+        34
+      ],
+      "before": "wx$_{i}$ - b ≥ 1 if y$_{i}$ = +1",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1840",
+          "candidate_charspan": [
+            2,
+            34
+          ],
+          "candidate_text": "wx$_{i}$ - b ≥ 1 if y$_{i}$ = +1",
+          "tokens": [
+            "w",
+            "x",
+            "i",
+            "−",
+            "b",
+            "≥",
+            "1",
+            "i",
+            "f",
+            "y",
+            "i",
+            "=",
+            "+",
+            "1"
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>",
+            "−",
+            "b",
+            "≥",
+            "1",
+            "i",
+            "f",
+            "y",
+            "<sub>",
+            "i",
+            "</sub>",
+            "=",
+            "+",
+            "1"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1842,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1841
+            },
+            {
+              "sequence_index": 1850,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1849
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "w",
+        "x",
+        "i",
+        "−",
+        "b",
+        "≥",
+        "1",
+        "i",
+        "f",
+        "y",
+        "i",
+        "=",
+        "+",
+        "1"
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>",
+        "−",
+        "b",
+        "≥",
+        "1",
+        "i",
+        "f",
+        "y",
+        "<sub>",
+        "i",
+        "</sub>",
+        "=",
+        "+",
+        "1"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1842,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1841
+        },
+        {
+          "sequence_index": 1850,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1849
+        }
+      ],
+      "status": "rejected",
+      "reason": "candidate_contains_unproven_connective"
+    },
+    {
+      "target_id": "pdf-source:2:1859",
+      "kind": "replacement",
+      "region_ids": [
+        "pdf-source:2:1859"
+      ],
+      "region_id": "pdf-source:2:1859",
+      "page": 2,
+      "docling_ref": "#/texts/28",
+      "charspan": [
+        2,
+        35
+      ],
+      "before": "wx$_{i}$ - b ≤ -1 if y$_{i}$ = -1",
+      "source_proofs": [
+        {
+          "region_id": "pdf-source:2:1859",
+          "candidate_charspan": [
+            2,
+            35
+          ],
+          "candidate_text": "wx$_{i}$ - b ≤ -1 if y$_{i}$ = -1",
+          "tokens": [
+            "w",
+            "x",
+            "i",
+            "−",
+            "b",
+            "≤",
+            "−",
+            "1",
+            "i",
+            "f",
+            "y",
+            "i",
+            "=",
+            "−",
+            "1"
+          ],
+          "signature": [
+            "<bold>",
+            "w",
+            "x",
+            "</bold>",
+            "<sub>",
+            "i",
+            "</sub>",
+            "−",
+            "b",
+            "≤",
+            "−",
+            "1",
+            "i",
+            "f",
+            "y",
+            "<sub>",
+            "i",
+            "</sub>",
+            "=",
+            "−",
+            "1"
+          ],
+          "relations": [
+            {
+              "sequence_index": 1861,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1860
+            },
+            {
+              "sequence_index": 1870,
+              "token": "i",
+              "role": "subscript",
+              "anchor_sequence_index": 1869
+            }
+          ]
+        }
+      ],
+      "source_tokens": [
+        "w",
+        "x",
+        "i",
+        "−",
+        "b",
+        "≤",
+        "−",
+        "1",
+        "i",
+        "f",
+        "y",
+        "i",
+        "=",
+        "−",
+        "1"
+      ],
+      "source_signature": [
+        "<bold>",
+        "w",
+        "x",
+        "</bold>",
+        "<sub>",
+        "i",
+        "</sub>",
+        "−",
+        "b",
+        "≤",
+        "−",
+        "1",
+        "i",
+        "f",
+        "y",
+        "<sub>",
+        "i",
+        "</sub>",
+        "=",
+        "−",
+        "1"
+      ],
+      "source_relations": [
+        {
+          "sequence_index": 1861,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1860
+        },
+        {
+          "sequence_index": 1870,
+          "token": "i",
+          "role": "subscript",
+          "anchor_sequence_index": 1869
+        }
+      ],
+      "status": "rejected",
+      "reason": "candidate_contains_unproven_connective"
+    }
+  ]
+}
