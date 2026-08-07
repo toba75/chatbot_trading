@@ -88,9 +88,18 @@ docker compose `
   --env-file .env.rails `
   -f compose.docling-serve.yaml `
   -f compose.rails.yaml `
-  --profile test run --rm test `
-  bundle exec rails test test/system/pdf_conversion_test.rb
+  -f compose.rails-system-test.yaml `
+  --profile test run --rm system-test
 ```
+
+La pile réelle de test possède son propre serveur Rails et ses propres workers,
+en `RAILS_ENV=test`. Elle utilise les bases fixes `ui_system_test` et
+`ui_system_test_cable`, ainsi que le volume Docker dédié
+`rails_system_test_storage`, quel que soit l'environnement applicatif actif.
+Son worker utilise exclusivement le service `docling-serve` de cette pile. Le
+lanceur compare avant tout import l'identité HTTP aux ressources réellement
+ouvertes par le serveur : environnement Rails, bases primaire et Cable, puis
+racine Active Storage.
 
 Les paramètres de capacité, les délais, les noms de bases, la taille maximale
 du PDF et les limites du flux et des artefacts de qualification sont tous

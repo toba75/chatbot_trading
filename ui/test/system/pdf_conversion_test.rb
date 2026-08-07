@@ -1,7 +1,13 @@
 require "application_system_test_case"
+require "net/http"
 
 class PdfConversionTest < ApplicationSystemTestCase
+  test "vérifie l'identité de la cible avant le parcours réel" do
+    assert_system_test_environment!
+  end
+
   test "convertit réellement le PDF de référence et rafraîchit l'écran par Cable" do
+    assert_system_test_environment!
     reference_pdf = unique_reference_pdf
     filename = reference_pdf.basename.to_s
     visit root_path
@@ -30,6 +36,21 @@ class PdfConversionTest < ApplicationSystemTestCase
   end
 
   private
+
+  def assert_system_test_environment!
+    uri = URI.join(Capybara.app_host, system_test_environment_path)
+    response = Net::HTTP.start(
+      uri.host,
+      uri.port,
+      use_ssl: uri.scheme == "https",
+      open_timeout: 5,
+      read_timeout: 5
+    ) { |http| http.get(uri.request_uri) }
+
+    assert_equal "200", response.code, "La cible du test système n'est pas en environnement test."
+    assert_equal ENV.fetch("SYSTEM_TEST_EXPECTED_IDENTITY"), response.body,
+      "L'identité de la cible du test système est incohérente."
+  end
 
   def unique_reference_pdf
     source = File.binread("/reference/ostrading-environment-qualification-5-pages.pdf")

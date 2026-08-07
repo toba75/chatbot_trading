@@ -1,4 +1,6 @@
 ENV["RAILS_ENV"] ||= "test"
+raise "La suite Rails doit s'exécuter avec RAILS_ENV=test." unless ENV["RAILS_ENV"] == "test"
+
 require_relative "../config/environment"
 require "rails/test_help"
 

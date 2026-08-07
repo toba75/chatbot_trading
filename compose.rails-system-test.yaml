@@ -1,0 +1,5 @@
+services:
+  system-test-jobs:
+    depends_on:
+      docling-serve:
+        condition: service_healthy

@@ -39,8 +39,26 @@ x-rails-environment: &rails_environment
   PDF_MAX_BYTES: "${PDF_MAX_BYTES:?PDF_MAX_BYTES requis}"
   RAILS_ACTIVE_STORAGE_ROOT: "${RAILS_ACTIVE_STORAGE_ROOT:-/app/storage}"
   RAILS_TEST_ACTIVE_STORAGE_ROOT: "${RAILS_TEST_ACTIVE_STORAGE_ROOT:-/app/tmp/storage}"
-  SYSTEM_TEST_APP_URL: "${SYSTEM_TEST_APP_URL:?SYSTEM_TEST_APP_URL requis}"
   SYSTEM_TEST_WAIT_SECONDS: "${SYSTEM_TEST_WAIT_SECONDS:?SYSTEM_TEST_WAIT_SECONDS requis}"
+
+x-rails-unit-test-environment: &rails_unit_test_environment
+  <<: *rails_environment
+  RAILS_ENV: test
+  SYSTEM_TEST_APP_URL: "http://system-test-web:3000"
+  SYSTEM_TEST_EXPECTED_IDENTITY: "test|${RAILS_TEST_PRIMARY_DATABASE:?RAILS_TEST_PRIMARY_DATABASE requis}|${RAILS_TEST_CABLE_DATABASE:?RAILS_TEST_CABLE_DATABASE requis}|${RAILS_TEST_ACTIVE_STORAGE_ROOT:-/app/tmp/storage}"
+
+x-rails-system-test-environment: &rails_system_test_environment
+  <<: *rails_environment
+  RAILS_ENV: test
+  PRIMARY_DATABASE: ui_system_test
+  CABLE_DATABASE: ui_system_test_cable
+  TEST_PRIMARY_DATABASE: ui_system_test
+  TEST_CABLE_DATABASE: ui_system_test_cable
+  RAILS_ACTIVE_STORAGE_ROOT: /app/system-test-storage
+  RAILS_TEST_ACTIVE_STORAGE_ROOT: /app/system-test-storage
+  SYSTEM_TEST_APP_URL: "http://system-test-web:3000"
+  SYSTEM_TEST_EXPECTED_IDENTITY: "test|ui_system_test|ui_system_test_cable|/app/system-test-storage"
+  DOCLING_SERVERS: '[{"name":"system-test-local","url":"http://docling-serve:5001","priority":1}]'
 
 x-rails-volumes: &rails_volumes
   - ./ui:/app
@@ -51,6 +69,11 @@ x-rails-test-volumes: &rails_test_volumes
   - ./ui:/app
   - ./reference:/reference:ro
   - "${RAILS_TEST_ACTIVE_STORAGE_HOST_PATH:?RAILS_TEST_ACTIVE_STORAGE_HOST_PATH requis}:/app/tmp/storage"
+
+x-rails-system-test-volumes: &rails_system_test_volumes
+  - ./ui:/app
+  - ./reference:/reference:ro
+  - rails_system_test_storage:/app/system-test-storage
 
 services:
   math-audit:
@@ -165,13 +188,67 @@ services:
   test-setup:
     image: chatbot-trading-ui:development
     command: bundle exec rails db:prepare
-    environment:
-      <<: *rails_environment
-      RAILS_ENV: test
+    environment: *rails_unit_test_environment
     volumes: *rails_test_volumes
     depends_on:
-      setup:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - test
+    restart: "no"
+
+  system-test-setup:
+    image: chatbot-trading-ui:development
+    command: bundle exec rails db:prepare
+    environment: *rails_system_test_environment
+    volumes: *rails_system_test_volumes
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - test
+    restart: "no"
+
+  system-test-jobs:
+    image: chatbot-trading-ui:development
+    command: bundle exec ruby bin/jobs
+    environment: *rails_system_test_environment
+    volumes: *rails_system_test_volumes
+    depends_on:
+      system-test-setup:
         condition: service_completed_successfully
+      math-audit:
+        condition: service_healthy
+    cpus: "${RAILS_JOBS_CPUS:?RAILS_JOBS_CPUS requis}"
+    mem_limit: "${RAILS_JOBS_MEMORY:?RAILS_JOBS_MEMORY requis}"
+    pids_limit: "${RAILS_JOBS_PIDS_LIMIT:?RAILS_JOBS_PIDS_LIMIT requis}"
+    profiles:
+      - test
+    restart: "no"
+
+  system-test-web:
+    image: chatbot-trading-ui:development
+    command: bundle exec rails server --binding=0.0.0.0
+    environment: *rails_system_test_environment
+    volumes: *rails_system_test_volumes
+    depends_on:
+      system-test-setup:
+        condition: service_completed_successfully
+      system-test-jobs:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - ruby
+        - -rnet/http
+        - -e
+        - 'response = Net::HTTP.get_response(URI("http://127.0.0.1:3000/system-test/environment")); abort unless response.is_a?(Net::HTTPSuccess) && response.body == ENV.fetch("SYSTEM_TEST_EXPECTED_IDENTITY")'
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    cpus: "${RAILS_WEB_CPUS:?RAILS_WEB_CPUS requis}"
+    mem_limit: "${RAILS_WEB_MEMORY:?RAILS_WEB_MEMORY requis}"
+    pids_limit: "${RAILS_WEB_PIDS_LIMIT:?RAILS_WEB_PIDS_LIMIT requis}"
     profiles:
       - test
     restart: "no"
@@ -179,9 +256,7 @@ services:
   test:
     image: chatbot-trading-ui:development
     command: bundle exec rails test
-    environment:
-      <<: *rails_environment
-      RAILS_ENV: test
+    environment: *rails_unit_test_environment
     volumes: *rails_test_volumes
     depends_on:
       test-setup:
@@ -189,5 +264,17 @@ services:
     profiles:
       - test
 
+  system-test:
+    image: chatbot-trading-ui:development
+    command: bundle exec rails test test/system/pdf_conversion_test.rb
+    environment: *rails_system_test_environment
+    volumes: *rails_system_test_volumes
+    depends_on:
+      system-test-web:
+        condition: service_healthy
+    profiles:
+      - test
+
 volumes:
   rails_postgres:
+  rails_system_test_storage:
