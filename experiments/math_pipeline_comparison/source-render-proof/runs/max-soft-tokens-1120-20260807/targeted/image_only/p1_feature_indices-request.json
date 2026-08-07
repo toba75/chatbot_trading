@@ -1,0 +1,10 @@
+{
+  "model": "google/gemma-4-26B-A4B-it",
+  "temperature": 0,
+  "max_tokens": 2048,
+  "prompt": "Transcribe exactly this crop from one PDF page. Preserve every visible symbol. Use valid LaTeX for mathematics. Do not summarize, correct the author, add commentary, or wrap the answer in a code fence. Return the visible text as Markdown. ",
+  "image": {
+    "path": "C:\\Users\\maxim\\python\\chatbot_trading\\experiments\\math_pipeline_comparison\\source-render-proof\\runs\\max-soft-tokens-1120-20260807\\crops\\p1_feature_indices-600dpi.png",
+    "sha256": "f41323a6081152b631b34981b4a9d197ae8e6e62fd3df9c418d863bbb3acbc0f"
+  }
+}
