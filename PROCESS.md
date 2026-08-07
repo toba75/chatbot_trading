@@ -1,7 +1,8 @@
 # Processus de conversion et de qualification PDF
 
-Toutes les pages sont confiées à Docling Serve avec le preset Granite CUDA. Il
-n’existe ni routage de pages, ni moteur alternatif, ni fallback CPU.
+Toutes les pages sont confiées à un serveur Docling Serve avec le preset Granite
+CUDA. Les serveurs sont ordonnés par priorité ; le serveur distant est
+actuellement P1 et le serveur local P2.
 
 ```mermaid
 flowchart LR
@@ -9,8 +10,11 @@ flowchart LR
     R --> P[("PostgreSQL")]
     R --> CQ["Solid Queue · conversions"]
     CQ --> C["ConvertDocumentJob"]
-    C -->|"PDF"| D["Docling Serve · Granite CUDA"]
-    D -->|"DoclingDocument + exports"| C
+    C -->|"réservation + PDF"| D["Pool Docling · priorité et capacité"]
+    D --> S1["Docling distant · P1"]
+    D --> S2["Docling local · P2"]
+    S1 -->|"DoclingDocument + exports"| C
+    S2 -->|"DoclingDocument + exports"| C
     C --> P
     C --> MQ["Solid Queue · math_qualifications"]
     MQ --> M["QualifyMathJob"]
@@ -30,11 +34,20 @@ signature `%PDF-`. Il calcule le SHA-256 et conserve les octets originaux avec
 Active Storage. Une `ConversionAttempt` distincte porte l’état, les horaires,
 les erreurs et les sorties de chaque exécution.
 
-`ConvertDocumentJob` appelle une seule fois `/v1/convert/file`. La limite
+Avant l'appel, `ConvertDocumentJob` réserve atomiquement dans PostgreSQL le
+premier serveur libre selon `DOCLING_SERVERS`. Une tentative affectée et encore
+sans `docling_server_returned_at` occupe son serveur, même si Rails détecte
+ensuite la perte du worker. Seule la réception effective d'une réponse Docling
+libère la capacité. Si tous les serveurs sont occupés, la tentative reste en
+attente et le worker réessaie ; elle n'est jamais envoyée à deux serveurs. Le
+nom, l'URL et l'heure d'affectation sont persistés sur la tentative.
+
+Le job appelle ensuite une seule fois `/v1/convert/file` sur le serveur réservé. La limite
 Docling est de 24 heures. Une réussite conserve sans les modifier la réponse
 brute, le `DoclingDocument` JSON, les DocTags, l’HTML et le Markdown. Une erreur
 réseau, HTTP ou Docling passe la tentative à `failed` et conserve toutes les
-sorties déjà reçues. Il n’existe ni retry automatique ni moteur de secours.
+sorties déjà reçues. Une erreur du serveur réservé n'entraîne aucun renvoi vers
+le serveur suivant : il n’existe ni retry automatique ni fallback silencieux.
 
 Le contrat exige une provenance canonique pour chaque élément qui porte du
 contenu. Un élément de `texts` dont `text` et `orig` sont exactement vides peut

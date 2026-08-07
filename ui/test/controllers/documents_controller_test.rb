@@ -310,8 +310,29 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(iframe[src="#{html_preview_document_path(document)}"]), count: 1
     assert_select %([data-page-sync-target="htmlSyncNotice"]), text: /synchronisation HTML par page/
     assert_not_includes response.body, "&lt;script&gt;résumé&lt;/script&gt;"
-    assert_select "li", text: /Page 5.+vide/
-    assert_match(/2 images.+pages 2 et 3/m, response.body)
+    assert_select ".conversion-warning[role='alert']", text: /1 page semble vide.+page 5/
+    assert_select ".conversion-warning[data-controller='blank-page-navigation'] a[href='#document-visualization-panel'][data-action='blank-page-navigation#show'][data-blank-page-navigation-page-param='5']",
+      text: "5"
+    assert_select ".quality-summary", count: 0
+    assert_select ".page-details", count: 0
+  end
+
+  test "n'affiche aucune synthèse quand aucune page ne semble vide" do
+    document, attempt = completed_document
+    content = JSON.parse(attempt.docling_document.download)
+    content.fetch("texts") << { "prov" => [ { "page_no" => 5 } ] }
+    attempt.docling_document.attach(
+      io: StringIO.new(JSON.generate(content)),
+      filename: "document.json",
+      content_type: "application/json"
+    )
+
+    get document_path(document)
+
+    assert_response :success
+    assert_select ".conversion-warning", count: 0
+    assert_select ".quality-summary", count: 0
+    assert_select ".page-details", count: 0
   end
 
   test "sert l'HTML exact avec une politique de confinement" do

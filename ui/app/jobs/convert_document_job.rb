@@ -10,16 +10,21 @@ class ConvertDocumentJob < ApplicationJob
   self.enqueue_after_transaction_commit = true
 
   def perform(attempt)
-    begin_conversion!(attempt)
     result = attempt.document.source_pdf.open do |file|
-      docling_client.convert(
-        file: file,
-        filename: attempt.document.source_pdf.filename.to_s,
-        options: attempt.conversion_options
-      )
+      server = begin_conversion!(attempt)
+      begin
+        docling_client(server.url).convert(
+          file: file,
+          filename: attempt.document.source_pdf.filename.to_s,
+          options: attempt.conversion_options
+        ).tap { mark_docling_returned!(attempt) }
+      rescue DoclingClient::ConversionError => error
+        mark_docling_returned!(attempt) if error.result
+        raise
+      end
     end
     persist_result!(attempt, result)
-  rescue InvalidState, InterruptedExecution
+  rescue InvalidState, InterruptedExecution, DoclingServerPool::InvalidAttempt
     raise
   rescue DoclingClient::ConversionError => error
     persist_failure!(attempt, error)
@@ -37,13 +42,7 @@ class ConvertDocumentJob < ApplicationJob
   def begin_conversion!(attempt)
     interrupted = false
     attempt.with_lock do
-      if conversion_ready_for_job?(attempt)
-        attempt.update!(
-          status: "converting",
-          started_at: Time.current,
-          execution_job_id: job_id
-        )
-      elsif attempt.converting? && attempt.execution_job_id == job_id
+      if attempt.converting? && attempt.execution_job_id == job_id
         attempt.update!(
           status: "failed",
           error_code: "interrupted_execution",
@@ -51,17 +50,30 @@ class ConvertDocumentJob < ApplicationJob
           completed_at: Time.current
         )
         interrupted = true
-      else
+      elsif !conversion_ready_for_job?(attempt)
         raise InvalidState, "La tentative #{attempt.id} n'est plus en attente."
       end
     end
-    return unless interrupted
+    if interrupted
+      raise InterruptedExecution, "La tentative #{attempt.id} interrompue a été rendue terminale."
+    end
 
-    raise InterruptedExecution, "La tentative #{attempt.id} interrompue a été rendue terminale."
+    docling_server_pool.acquire(attempt, job_id: job_id)
   end
 
-  def docling_client
-    DoclingClient.new
+  def docling_client(base_url)
+    DoclingClient.new(base_url: base_url)
+  end
+
+  def docling_server_pool
+    DoclingServerPool.new
+  end
+
+  def mark_docling_returned!(attempt)
+    attempt.with_lock do
+      ensure_active!(attempt)
+      attempt.update!(docling_server_returned_at: Time.current)
+    end
   end
 
   def conversion_ready_for_job?(attempt)

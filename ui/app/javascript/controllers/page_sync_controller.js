@@ -23,7 +23,10 @@ export default class extends Controller {
       }
       this.pageTarget.max = this.pdf.numPages
       this.totalTarget.textContent = this.pdf.numPages
-      await this.showPage(1)
+      const requestedPage = Number.parseInt(this.pageTarget.value, 10)
+      const initialPage = this.pendingPage || requestedPage || 1
+      this.pendingPage = null
+      await this.showPage(initialPage)
     } catch (error) {
       this.showError("Le PDF original n’a pas pu être affiché.")
       console.error(error)
@@ -70,7 +73,11 @@ export default class extends Controller {
   }
 
   async showPage(requestedPage) {
-    if (!this.pdf || this.incompatiblePageCounts || !Number.isInteger(requestedPage)) return
+    if (this.incompatiblePageCounts || !Number.isInteger(requestedPage)) return
+    if (!this.pdf) {
+      this.pendingPage = requestedPage
+      return
+    }
 
     const pageNumber = Math.min(Math.max(requestedPage, 1), this.pdf.numPages)
     const version = ++this.renderVersion
@@ -104,6 +111,7 @@ export default class extends Controller {
       canvas.style.width = `${Math.floor(viewport.width)}px`
       canvas.style.height = `${Math.floor(viewport.height)}px`
       canvas.getContext("2d").drawImage(stagedCanvas, 0, 0)
+      canvas.dataset.renderedPage = pageNumber
       this.currentPage = pageNumber
       this.statusTarget.hidden = true
       this.updateNavigation()

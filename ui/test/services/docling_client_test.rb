@@ -1,11 +1,12 @@
 require "test_helper"
 
 class DoclingClientTest < ActiveSupport::TestCase
+  BASE_URL = "http://docling.test:5001"
   Response = Data.define(:code, :body)
 
   test "demande toutes les représentations sans simplifier la réponse" do
     transport = RecordingTransport.new(Response.new(code: "200", body: successful_body))
-    client = DoclingClient.new(transport: transport)
+    client = DoclingClient.new(base_url: BASE_URL, transport: transport)
 
     result = File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
       client.convert(file: file, filename: "reference.pdf", options: DoclingClient.conversion_options)
@@ -27,7 +28,7 @@ class DoclingClientTest < ActiveSupport::TestCase
 
   test "refuse une réponse Docling incomplète" do
     body = JSON.generate(status: "success", errors: [], document: { json_content: {} })
-    client = DoclingClient.new(transport: RecordingTransport.new(Response.new(code: "200", body: body)))
+    client = DoclingClient.new(base_url: BASE_URL, transport: RecordingTransport.new(Response.new(code: "200", body: body)))
 
     error = assert_raises(DoclingClient::ConversionError) do
       File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
@@ -41,7 +42,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   test "refuse un document sans inventaire de pages" do
     payload = JSON.parse(successful_body)
     payload.fetch("document").fetch("json_content").delete("pages")
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
 
@@ -57,7 +58,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   test "refuse un document sans image complète de page" do
     payload = JSON.parse(successful_body)
     payload.fetch("document").fetch("json_content").fetch("pages").fetch("1").delete("image")
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
 
@@ -73,7 +74,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   test "refuse une page sans numéro canonique" do
     payload = JSON.parse(successful_body)
     payload.fetch("document").fetch("json_content").fetch("pages").fetch("1").delete("page_no")
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
 
@@ -91,7 +92,7 @@ class DoclingClientTest < ActiveSupport::TestCase
     page = payload.dig("document", "json_content", "pages").delete("1")
     page["page_no"] = 2
     payload.dig("document", "json_content", "pages")["2"] = page
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
 
@@ -107,7 +108,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   test "refuse un élément sans provenance canonique" do
     payload = JSON.parse(successful_body)
     payload.fetch("document").fetch("json_content")["texts"] = [ { "text" => "sans provenance" } ]
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
 
@@ -131,7 +132,7 @@ class DoclingClientTest < ActiveSupport::TestCase
       "parent" => { "$ref" => "#/body" }
     }
     payload.fetch("document").fetch("json_content")["texts"] = [ empty_text ]
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
     log = StringIO.new
@@ -153,7 +154,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   test "refuse un tableau vide sans provenance" do
     payload = JSON.parse(successful_body)
     payload.fetch("document").fetch("json_content")["tables"] = [ { "prov" => [] } ]
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
 
@@ -171,7 +172,7 @@ class DoclingClientTest < ActiveSupport::TestCase
     payload.fetch("document").fetch("json_content")["texts"] = [
       { "text" => "", "orig" => "", "prov" => [] }
     ]
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
 
@@ -188,7 +189,7 @@ class DoclingClientTest < ActiveSupport::TestCase
     payload = JSON.parse(successful_body)
     payload.fetch("document").fetch("json_content").fetch("pages").fetch("1").fetch("image")["uri"] =
       "data:image/png;base64,"
-    client = DoclingClient.new(
+    client = DoclingClient.new(base_url: BASE_URL,
       transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
     )
 
@@ -202,7 +203,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   end
 
   test "refuse une racine JSON qui n'est pas un objet" do
-    client = DoclingClient.new(transport: RecordingTransport.new(Response.new(code: "200", body: "null")))
+    client = DoclingClient.new(base_url: BASE_URL, transport: RecordingTransport.new(Response.new(code: "200", body: "null")))
 
     error = assert_raises(DoclingClient::ConversionError) do
       File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
@@ -215,7 +216,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   end
 
   test "normalise une erreur réseau explicite" do
-    client = DoclingClient.new(transport: RaisingTransport.new(Errno::EHOSTUNREACH.new))
+    client = DoclingClient.new(base_url: BASE_URL, transport: RaisingTransport.new(Errno::EHOSTUNREACH.new))
 
     error = assert_raises(DoclingClient::ConversionError) do
       File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
@@ -227,7 +228,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   end
 
   test "normalise une erreur d'écriture réseau explicite" do
-    client = DoclingClient.new(transport: RaisingTransport.new(Net::WriteTimeout.new("écriture interrompue")))
+    client = DoclingClient.new(base_url: BASE_URL, transport: RaisingTransport.new(Net::WriteTimeout.new("écriture interrompue")))
 
     error = assert_raises(DoclingClient::ConversionError) do
       File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
@@ -241,7 +242,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   test "conserve les sorties partielles d'une erreur HTTP" do
     payload = JSON.parse(successful_body).merge("status" => "failure", "errors" => [ "internal" ])
     body = JSON.generate(payload)
-    client = DoclingClient.new(transport: RecordingTransport.new(Response.new(code: "500", body: body)))
+    client = DoclingClient.new(base_url: BASE_URL, transport: RecordingTransport.new(Response.new(code: "500", body: body)))
 
     error = assert_raises(DoclingClient::ConversionError) do
       File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
@@ -257,7 +258,7 @@ class DoclingClientTest < ActiveSupport::TestCase
   test "conserve la réponse et les sorties partielles d'un échec Docling" do
     payload = JSON.parse(successful_body).merge("status" => "failure", "errors" => [ "timeout" ])
     body = JSON.generate(payload)
-    client = DoclingClient.new(transport: RecordingTransport.new(Response.new(code: "200", body: body)))
+    client = DoclingClient.new(base_url: BASE_URL, transport: RecordingTransport.new(Response.new(code: "200", body: body)))
 
     error = assert_raises(DoclingClient::ConversionError) do
       File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|

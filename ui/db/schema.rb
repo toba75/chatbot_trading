@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_05_124500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_07_212000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -46,6 +46,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_124500) do
     t.datetime "completed_at"
     t.jsonb "conversion_options", null: false
     t.datetime "created_at", null: false
+    t.datetime "docling_server_assigned_at"
+    t.string "docling_server_name"
+    t.datetime "docling_server_returned_at"
+    t.string "docling_server_url"
     t.bigint "document_id", null: false
     t.string "error_code"
     t.text "error_message"
@@ -56,6 +60,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_124500) do
     t.string "status", null: false
     t.datetime "updated_at", null: false
     t.index ["document_id"], name: "index_conversion_attempts_on_document_id"
+    t.index ["docling_server_name"], name: "index_unreturned_docling_assignments_on_name", where: "(docling_server_returned_at IS NULL)"
+    t.index ["docling_server_url"], name: "index_unreturned_docling_assignments_on_url", where: "(docling_server_returned_at IS NULL)"
     t.check_constraint "status::text <> 'converting'::text OR execution_job_id IS NOT NULL", name: "conversion_attempts_active_execution"
     t.check_constraint "status::text = ANY (ARRAY['staging'::character varying, 'queued'::character varying, 'converting'::character varying, 'succeeded'::character varying, 'failed'::character varying]::text[])", name: "conversion_attempts_status"
   end

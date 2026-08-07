@@ -54,23 +54,33 @@ docker compose `
 L’interface est alors disponible sur `http://127.0.0.1:3000`. Le service
 `setup` prépare explicitement les bases et les schémas avant `web` et `jobs`.
 Les files `conversions` et `math_qualifications` ont leurs propres workers.
+`DOCLING_SERVERS` déclare la liste ordonnée des serveurs et leur priorité. Un
+worker réserve le premier serveur libre dans PostgreSQL : le distant est P1 et
+le local P2 dans la configuration fournie. Deux conversions peuvent donc être
+traitées simultanément ; les suivantes attendent qu'un retour Docling soit
+effectivement reçu. Un échec Rails ou réseau sans retour conserve donc la
+capacité occupée. Une erreur sur le serveur réservé n'est pas rejouée sur un autre
+serveur.
 Chaque job persiste son identifiant de prise en charge. Après un arrêt brutal,
 le réconciliateur relie la `FailedExecution` Solid Queue à l’état métier et
 rend l’exécution `failed` avec `interrupted_execution`, sans rejouer
 silencieusement Docling ou l’analyse mathématique. Sa cadence vient de
 `INTERRUPTED_EXECUTION_RECONCILIATION_SCHEDULE`.
 
-## Tests rapides
+## Chaîne de test de l'interface
+
+Cette chaîne utilise un document déjà converti et ne contacte pas Docling.
 
 ```powershell
 docker compose --env-file .env.rails -f compose.rails.yaml --profile test `
-  run --rm test bundle exec rails test
+  run --rm test bundle exec rails test test/system/document_interface_test.rb
 ```
 
-## Qualification réelle
+## Chaîne réelle de conversion
 
-Cette commande convertit réellement le PDF de référence ; elle n’est pas un
-test rapide et ne doit pas être relancée après chaque modification locale.
+Cette commande convertit réellement le PDF de référence. Elle est réservée aux
+changements du pool, du client Docling ou du contrat de conversion et ne doit
+pas être lancée pour une modification limitée à l'interface.
 
 ```powershell
 docker compose `
@@ -79,7 +89,7 @@ docker compose `
   -f compose.docling-serve.yaml `
   -f compose.rails.yaml `
   --profile test run --rm test `
-  bundle exec rails test:system test/system/pdf_conversion_test.rb
+  bundle exec rails test test/system/pdf_conversion_test.rb
 ```
 
 Les paramètres de capacité, les délais, les noms de bases, la taille maximale

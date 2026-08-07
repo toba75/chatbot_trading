@@ -55,6 +55,12 @@
   moins de dix secondes pour la boucle courante.
 - Les tests concernés restent lisibles, débogables et compatibles avec `xdist`.
 - Ne lance pas de gate global ou de test coûteux après chaque petite modification.
+- La chaîne de test de conversion de documents et la chaîne de test de
+  l'interface sont distinctes. Lance uniquement la ou les chaînes concernées
+  par la modification en cours.
+- La chaîne d'interface part d'un document déjà converti et ne déclenche pas
+  Docling. La chaîne de conversion réelle est réservée aux changements du
+  routage, du client Docling ou du contrat des artefacts de conversion.
 - Réserve la suite complète du dépôt à l'intégration, au déploiement ou à une
   demande explicite du développeur.
 - Après le GREEN rapide, valide une fois le chemin réel si une frontière externe

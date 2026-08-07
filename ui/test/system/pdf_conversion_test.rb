@@ -16,73 +16,13 @@ class PdfConversionTest < ApplicationSystemTestCase
       exact_text: next_elapsed_second(running_elapsed),
       wait: 5
     )
-    assert_text "5 pages"
-    assert_text "Page 5 — vide"
-    assert_text "2 images — pages 2 et 3"
+    assert_text "1 page semble vide — page 5"
     assert_selector %(canvas[title="Page courante du PDF original"])
     assert_text "Qualification mathématique"
     assert_text(/Verdict sémantique : (conformant_within_scope|contradicted|partial|non_verifiable)/)
     assert_link "Rapport de qualification"
     assert_link "Preuve source"
     assert_link "Réponse brute de l’analyseur"
-
-    click_on "HTML natif paginé"
-    assert_selector %(a[role="tab"][aria-selected="true"]), text: "HTML natif paginé"
-    html_label = "HTML natif paginé"
-    within_frame(find(%(iframe[title="#{html_label} — page 1"]))) do
-      assert_selector "img", count: 2
-      page.execute_script <<~JAVASCRIPT
-        const container = document.querySelector(".page");
-        const math = document.createElement("math");
-        math.setAttribute("display", "block");
-        const row = document.createElement("mrow");
-        row.style.display = "inline-block";
-        row.style.width = "2400px";
-        math.appendChild(row);
-        container.prepend(math);
-        const pre = document.createElement("pre");
-        pre.textContent = "x".repeat(2400);
-        container.prepend(pre);
-      JAVASCRIPT
-      layout = page.evaluate_script <<~JAVASCRIPT
-        (() => {
-          const container = document.querySelector(".page");
-          const math = container.querySelector('math[display="block"]');
-          const pre = container.querySelector("pre");
-          return {
-            overflow: getComputedStyle(math).overflowX,
-            mathScrolls: math.scrollWidth > math.clientWidth,
-            preOverflow: getComputedStyle(pre).overflowX,
-            preScrolls: pre.scrollWidth > pre.clientWidth,
-            parentDoesNotOverflow: container.scrollWidth === container.clientWidth
-          };
-        })()
-      JAVASCRIPT
-      assert_equal "auto", layout.fetch("overflow")
-      assert layout.fetch("mathScrolls")
-      assert_equal "auto", layout.fetch("preOverflow")
-      assert layout.fetch("preScrolls")
-      assert layout.fetch("parentDoesNotOverflow")
-    end
-
-    fill_in "Page", with: "2"
-    find_field("Page").send_keys(:enter)
-    assert_selector %(iframe[title="#{html_label} — page 2"][src$="#page-2"])
-
-    click_on "Markdown"
-    assert_selector %(a[role="tab"][aria-selected="true"]), text: "Markdown"
-    within_frame(find(%(iframe[title="Conversion Markdown"]))) do
-      assert_text(/While the rules are free/)
-    end
-
-    find_link("Markdown").send_keys(:arrow_right)
-    assert_selector %(a[role="tab"][aria-selected="true"]), text: "JSON"
-    fill_in "Page", with: "2"
-    assert_selector %(iframe[title="Projection JSON de la page 2"])
-    within_frame(find(%(iframe[title="Projection JSON de la page 2"]))) do
-      assert_text(/"kind": "docling_page"/)
-      assert_text(/"page_no": 2/)
-    end
 
     completed_elapsed = find(%([data-controller="elapsed-time"])).text
     sleep 1.2

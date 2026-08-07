@@ -47,8 +47,8 @@ class DoclingClient
     )
   end
 
-  def initialize(transport: nil)
-    @endpoint = URI.join(ENV.fetch("DOCLING_SERVE_URL"), "/v1/convert/file")
+  def initialize(base_url:, transport: nil)
+    @endpoint = URI.join(base_url, "/v1/convert/file")
     @transport = transport || build_transport
   end
 

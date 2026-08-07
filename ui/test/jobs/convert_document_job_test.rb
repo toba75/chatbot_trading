@@ -2,6 +2,11 @@ require "test_helper"
 
 class ConvertDocumentJobTest < ActiveJob::TestCase
   REFERENCE_PDF = "/reference/ostrading-environment-qualification-5-pages.pdf"
+  TEST_SERVER = DoclingServerPool::Server.new(
+    name: "remote",
+    url: "http://docling-remote.test:5001",
+    priority: 1
+  )
 
   test "persiste sans perte toutes les représentations d'une conversion réussie" do
     attempt = create_attempt
@@ -21,6 +26,10 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     assert_equal attempt.conversion_options, client.recorded_options
     assert attempt.started_at
     assert attempt.completed_at
+    assert_equal "remote", attempt.docling_server_name
+    assert_equal TEST_SERVER.url, attempt.docling_server_url
+    assert attempt.docling_server_assigned_at
+    assert attempt.docling_server_returned_at
     qualification = attempt.current_math_qualification
     assert_predicate qualification, :queued?
     assert_equal attempt.document.source_sha256, qualification.source_sha256
@@ -42,6 +51,7 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     assert_equal "http_error", attempt.error_code
     assert_equal "Docling indisponible.", attempt.error_message
     assert attempt.completed_at
+    assert_nil attempt.docling_server_returned_at
   end
 
   test "conserve la réponse brute et chaque sortie disponible lors d'un échec" do
@@ -65,6 +75,7 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     assert_equal result.raw_body.b, attempt.docling_response.download
     assert_equal payload.dig("document", "json_content"), JSON.parse(attempt.docling_document.download)
     assert_equal "# Résultat partiel".b, attempt.markdown.download
+    assert attempt.docling_server_returned_at
     assert_not attempt.doctags.attached?
     assert_not attempt.html.attached?
   end
@@ -230,7 +241,8 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
 
   def job_with(client)
     ConvertDocumentJob.new.tap do |job|
-      job.define_singleton_method(:docling_client) { client }
+      job.define_singleton_method(:docling_client) { |_base_url| client }
+      job.define_singleton_method(:docling_server_pool) { FakePool.new(TEST_SERVER) }
     end
   end
 
@@ -280,6 +292,24 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
       raise @error if @error
 
       @result
+    end
+  end
+
+  class FakePool
+    def initialize(server)
+      @server = server
+    end
+
+    def acquire(attempt, job_id:)
+      attempt.update!(
+        status: "converting",
+        started_at: Time.current,
+        execution_job_id: job_id,
+        docling_server_name: @server.name,
+        docling_server_url: @server.url,
+        docling_server_assigned_at: Time.current
+      )
+      @server
     end
   end
 end
