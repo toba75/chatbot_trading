@@ -18,6 +18,10 @@ from .rails_credentials import load_google_books_credentials
 from .registry import CATALOG, build_skeleton, load_catalog, save_catalog, verify_catalog
 from .review import review_catalog
 
+# Une reprise ne rejoue que ce qui n'a pas abouti : une consultation réussie
+# n'est jamais re-interrogée, donc jamais dégradée par une limitation de débit.
+UNRESOLVED_STATES = {"unavailable", "not_queried"}
+
 
 def _manifest(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -37,6 +41,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--catalog", type=Path, default=CATALOG)
     parser.add_argument("--work", type=Path, default=WORK)
     parser.add_argument("--network", choices=("offline", "google-books"), default="offline")
+    parser.add_argument(
+        "--only-unresolved",
+        action="store_true",
+        help="Ne consulte que les entrées sans consultation aboutie ; les autres sont conservées.",
+    )
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--reviewer", default="codex")
     parser.add_argument("--date", dest="reviewed_at")
@@ -63,12 +72,24 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.action == "enrich":
         if arguments.network != "google-books":
             raise ValueError("L'enrichissement réseau exige --network google-books explicite")
-        credentials = load_google_books_credentials()
-        client = GoogleBooksClient(
-            timeout=arguments.timeout,
-            api_key=credentials.api_key,
+        only = None
+        if arguments.only_unresolved:
+            only = {
+                entry["source_sha256"]
+                for entry in catalog["documents"]
+                if entry["resolution"]["status"] in UNRESOLVED_STATES
+            }
+            print(f"reprise ciblée : {len(only)} entrée(s) à consulter")
+        client = None
+        if only is None or only:
+            credentials = load_google_books_credentials()
+            client = GoogleBooksClient(
+                timeout=arguments.timeout,
+                api_key=credentials.api_key,
+            )
+        catalog, report = enrich_catalog(
+            manifest, catalog, client=client, work=arguments.work, only=only
         )
-        catalog, report = enrich_catalog(manifest, catalog, client=client, work=arguments.work)
         save_catalog(catalog, arguments.catalog)
         report_path = arguments.catalog.with_name("enrichment-report.json")
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")

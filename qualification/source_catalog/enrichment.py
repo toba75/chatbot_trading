@@ -3,13 +3,40 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Collection
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+from .candidate_review import CANDIDATE_REVIEWS, apply_candidate_review, observed_candidates
+from .constants import QUERY_STATES, RESOLUTION_STATES
 from .google_books import GoogleBooksClient, InvalidProviderResponse, ProviderUnavailable, classify_resolution
 from .identity import lookup_for_entry
 from .registry import utc_now, validate_catalog
+
+
+# Une consultation qui n'a pas abouti garde son état propre : l'indisponibilité
+# du fournisseur n'est jamais confondue avec une absence de correspondance.
+CONSULTATION_BY_RESOLUTION = {
+    "unavailable": "unavailable",
+    "no_match": "no_match",
+    "not_queried": "not_queried",
+}
+
+# Le rapport publie tous les états du contrat, dans un ordre stable : un état
+# omis ferait disparaître des documents du total sans que rien ne le signale.
+CONSULTATION_ORDER = ("not_queried", "succeeded", "no_match", "unavailable", "expired")
+RESOLUTION_ORDER = (
+    "not_queried",
+    "accepted",
+    "ambiguous",
+    "candidate",
+    "rejected",
+    "no_match",
+    "unavailable",
+)
+assert set(CONSULTATION_ORDER) == QUERY_STATES
+assert set(RESOLUTION_ORDER) == RESOLUTION_STATES
 
 
 def _date_value(value: str | None) -> dict[str, Any] | None:
@@ -107,23 +134,21 @@ def enrich_catalog(
     manifest: dict[str, Any],
     catalog: dict[str, Any],
     *,
-    client: GoogleBooksClient,
+    client: GoogleBooksClient | None,
     work: Path | None = None,
     observed_at: str | None = None,
+    only: Collection[str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Remplace l'observation Google Books précédente sans toucher aux autres fournisseurs."""
-    report = {
-        "schema_version": 1,
-        "observed_at": observed_at or utc_now(),
-        "consultations": Counter(),
-        "resolutions": Counter(),
-        "candidate_states": Counter(),
-        "documents_by_kind": Counter(),
-        "identifier_coverage": Counter(),
-        "documents": [],
-    }
+    """Consulte Google Books, applique les revues, puis résume l'état du registre.
+
+    `only` restreint la consultation réseau aux empreintes indiquées. Les autres
+    entrées gardent leurs observations : une reprise après indisponibilité ne
+    rejoue pas — et ne peut donc pas dégrader — les consultations réussies.
+    """
     by_sha = {entry["sha256"]: entry for entry in manifest["documents"] if entry.get("included")}
-    for entry in catalog["documents"]:
+    for entry in catalog["documents"] if client is not None else []:
+        if only is not None and entry["source_sha256"] not in only:
+            continue
         manifest_entry = by_sha[entry["source_sha256"]]
         lookup = lookup_for_entry(manifest_entry, work)
         entry["lookup"] = {key: value for key, value in lookup.items() if key != "identifier_proofs"}
@@ -135,10 +160,6 @@ def enrich_catalog(
         ]
         isbns = lookup["identifiers"].get("isbn13", []) + lookup["identifiers"].get("isbn10", [])
         issns = lookup["identifiers"].get("issn", [])
-        report["documents_by_kind"][entry["document_kind"]] += 1
-        report["identifier_coverage"]["with_identifier" if isbns or issns else "without_identifier"] += 1
-        if len(isbns) > 1:
-            report["identifier_coverage"]["multiple_identifiers"] += 1
         try:
             result = client.resolve(
                 isbns=isbns,
@@ -157,7 +178,7 @@ def enrich_catalog(
                 publication_year=lookup.get("publication_year_hint"),
             )
             marked = {candidate["candidate_id"]: candidate for candidate in candidates}
-            document_candidate_states: dict[str, str] = {}
+            document_candidates: dict[str, dict[str, Any]] = {}
             for attempt in result["attempts"]:
                 attempt_candidates = [
                     marked.get(candidate["candidate_id"], candidate)
@@ -165,9 +186,7 @@ def enrich_catalog(
                 ]
                 entry["provider_observations"].append(_observation(attempt, attempt_candidates))
                 for candidate in attempt_candidates:
-                    document_candidate_states[candidate["candidate_id"]] = candidate.get("status", "candidate")
-            for state in document_candidate_states.values():
-                report["candidate_states"][state] += 1
+                    document_candidates[candidate["candidate_id"]] = candidate
             entry["resolution"] = {"status": resolution, "candidate_id": None, "proof": None}
             if resolution == "accepted" and candidates:
                 accepted = candidates[0]
@@ -179,10 +198,6 @@ def enrich_catalog(
                     },
                 }
                 _apply_candidate(entry, accepted)
-            consultation = "no_match" if resolution == "no_match" else "succeeded"
-            report["consultations"][consultation] += 1
-            report["resolutions"][resolution] += 1
-            report["documents"].append({"source_sha256": entry["source_sha256"], "consultation": consultation, "resolution": resolution, "candidate_count": len(candidates)})
         except ProviderUnavailable as error:
             entry["provider_observations"].append(_provider_error(
                 str(error),
@@ -192,9 +207,6 @@ def enrich_catalog(
                 query=getattr(error, "query", None),
             ))
             entry["resolution"] = {"status": "unavailable", "candidate_id": None, "proof": None}
-            report["consultations"]["unavailable"] += 1
-            report["resolutions"]["unavailable"] += 1
-            report["documents"].append({"source_sha256": entry["source_sha256"], "consultation": "unavailable", "resolution": "unavailable"})
         except InvalidProviderResponse as error:
             entry["provider_observations"].append(_provider_error(
                 str(error),
@@ -204,24 +216,79 @@ def enrich_catalog(
                 query=getattr(error, "query", None),
             ))
             entry["resolution"] = {"status": "unavailable", "candidate_id": None, "proof": None}
-            report["consultations"]["unavailable"] += 1
-            report["resolutions"]["unavailable"] += 1
-            report["documents"].append({"source_sha256": entry["source_sha256"], "consultation": "unavailable", "resolution": "unavailable"})
-    report["consultations"] = {
-        state: report["consultations"].get(state, 0)
-        for state in ("succeeded", "no_match", "unavailable")
-    }
-    report["resolutions"] = {
-        state: report["resolutions"].get(state, 0)
-        for state in ("accepted", "ambiguous", "candidate", "rejected", "no_match", "unavailable")
-    }
-    report["candidate_states"] = {
-        state: report["candidate_states"].get(state, 0)
-        for state in ("candidate", "accepted", "ambiguous", "rejected")
-    }
-    report["documents_by_kind"] = dict(report["documents_by_kind"])
-    report["identifier_coverage"] = dict(report["identifier_coverage"])
+    apply_reviews(catalog)
     issues = validate_catalog(catalog, manifest)
     if issues:
         raise ValueError("Registre invalide après enrichissement : " + "; ".join(issues))
-    return catalog, report
+    return catalog, summarize_catalog(catalog, observed_at=observed_at)
+
+
+def apply_reviews(
+    catalog: dict[str, Any],
+    *,
+    reviews: dict[str, dict[str, Any]] = CANDIDATE_REVIEWS,
+) -> None:
+    """Applique les décisions humaines à tout le registre, quelle que soit la passe.
+
+    L'opération est idempotente : une décision déjà appliquée redonne le même
+    état, de sorte qu'une reprise partielle ne perde aucune revue.
+    """
+    for entry in catalog["documents"]:
+        accepted = apply_candidate_review(
+            entry, entry["resolution"]["status"], reviews=reviews
+        )
+        if accepted is not None:
+            _apply_candidate(entry, accepted)
+
+
+def summarize_catalog(catalog: dict[str, Any], *, observed_at: str | None = None) -> dict[str, Any]:
+    """Résume l'état du registre, sans dépendre du périmètre de la consultation."""
+    consultations: Counter[str] = Counter()
+    resolutions: Counter[str] = Counter()
+    candidate_states: Counter[str] = Counter()
+    kinds: Counter[str] = Counter()
+    coverage: Counter[str] = Counter()
+    documents = []
+    for entry in catalog["documents"]:
+        resolution = entry["resolution"]["status"]
+        consultation = CONSULTATION_BY_RESOLUTION.get(resolution, "succeeded")
+        candidates = observed_candidates(entry)
+        for candidate in candidates.values():
+            candidate_states[candidate.get("status", "candidate")] += 1
+        identifiers = entry["lookup"]["identifiers"]
+        isbns = identifiers.get("isbn13", []) + identifiers.get("isbn10", [])
+        coverage["with_identifier" if isbns or identifiers.get("issn") else "without_identifier"] += 1
+        if len(isbns) > 1:
+            coverage["multiple_identifiers"] += 1
+        kinds[entry["document_kind"]] += 1
+        consultations[consultation] += 1
+        resolutions[resolution] += 1
+        decision = entry["resolution"].get("proof") or {}
+        documents.append({
+            "source_sha256": entry["source_sha256"],
+            "consultation": consultation,
+            "resolution": resolution,
+            "candidate_count": len(candidates),
+            "reviewed": decision.get("kind") == "manual",
+            # Chaque acceptation nomme son candidat et la ressource qui la prouve.
+            "accepted_candidate_id": entry["resolution"].get("candidate_id"),
+            "accepted_proof": {
+                key: decision[key]
+                for key in ("kind", "provider", "resource_id", "observed_at", "match", "reviewer")
+                if key in decision
+            }
+            or None,
+        })
+    return {
+        "schema_version": 1,
+        "observed_at": observed_at or utc_now(),
+        "consultations": {state: consultations.get(state, 0) for state in CONSULTATION_ORDER},
+        "resolutions": {state: resolutions.get(state, 0) for state in RESOLUTION_ORDER},
+        "candidate_states": {
+            state: candidate_states.get(state, 0)
+            for state in ("candidate", "accepted", "ambiguous", "rejected")
+        },
+        "documents_by_kind": dict(kinds),
+        "identifier_coverage": dict(coverage),
+        "documents": documents,
+    }

@@ -338,6 +338,31 @@ def test_l_export_ecrit_l_en_tete_et_les_chunks(tmp_path: Path) -> None:
     assert lines[1]["items"][0]["origin"] == "transcription"
 
 
+def test_l_export_refuse_un_rapport_qui_annonce_une_autre_empreinte(tmp_path: Path) -> None:
+    directory = tmp_path / ("f" * 12)
+    directory.mkdir(parents=True)
+    document = _document(_text(0, "Texte avec $x$ dedans."))
+    (directory / "docling-document.json").write_text(
+        document.model_dump_json(), encoding="utf-8"
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({"schema_version": 1, "documents": [ENTRY]}), encoding="utf-8"
+    )
+    rapport = _report(_source("#/texts/0", [12, 13], "matching"))
+
+    # Une empreinte de natif annoncée qui ne correspond pas au fichier lu.
+    rapport["docling_document"] = {"sha256": "0" * 64}
+    (directory / "report.json").write_text(json.dumps(rapport), encoding="utf-8")
+    assert main(["export", "--manifest", str(manifest_path), "--work", str(tmp_path)]) == 1
+
+    # Et une empreinte de recette annoncée qui ne correspond pas aux opérations.
+    del rapport["docling_document"]
+    rapport["development"] = {"recipe_sha256": "0" * 64}
+    (directory / "report.json").write_text(json.dumps(rapport), encoding="utf-8")
+    assert main(["export", "--manifest", str(manifest_path), "--work", str(tmp_path)]) == 1
+
+
 def test_la_projection_source_est_stable_et_sans_signal_commercial() -> None:
     catalog_entry = {
         "source_sha256": ENTRY["sha256"],

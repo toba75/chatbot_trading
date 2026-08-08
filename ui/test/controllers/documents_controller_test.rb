@@ -588,6 +588,35 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "text/markdown", document.current_attempt.markdown.content_type
   end
 
+  test "sert le Markdown développé et non le natif quand un supplément existe" do
+    document, attempt = completed_document
+    qualification = MathQualification.build_for(
+      attempt,
+      docling_document_sha256: Digest::SHA256.hexdigest(attempt.docling_document.download)
+    )
+    qualification.save!
+    developed = "# Titre\n\n<!-- origine: pdf_supplement -->\n> [supplément PDF] x\n"
+    qualification.derived_markdown.attach(
+      io: StringIO.new(developed), filename: "derived.md", content_type: "text/markdown"
+    )
+    qualification.update!(
+      status: "succeeded", phase: "persisting_result", completed_units: 1,
+      total_units: 1, verdict: "conformant_within_scope",
+      summary: {
+        "regions" => 0, "conformant" => 0, "contradicted" => 0, "non_verifiable" => 0,
+        "coverage" => { "pages_total" => 1, "pages_traced" => 1 }
+      }
+    )
+
+    get markdown_preview_document_path(document)
+
+    assert_response :success
+    assert_equal developed.b, response.body
+    # Le supplément reste démarqué comme dérivé dans ce que l'interface sert.
+    assert_includes response.body, "pdf_supplement"
+    assert_includes response.headers.fetch("Content-Security-Policy"), "sandbox"
+  end
+
   test "sert uniquement la projection JSON de la page demandée" do
     document, attempt = completed_document
     link = {

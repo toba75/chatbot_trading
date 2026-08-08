@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -70,6 +72,30 @@ def test_le_supplement_recopie_la_preuve_et_reste_explicitement_non_verifie() ->
     )[0]
     assert degraded["source_token_basis"] == "source_tokens"
     assert degraded["source_proof"]["source_canonical_tokens"] is None
+
+
+def _fingerprint(document: DoclingDocument) -> str:
+    payload = json.dumps(document.model_dump(mode="json"), sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def test_le_developpe_se_reconstruit_depuis_le_natif_et_la_recette() -> None:
+    natif = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    operations = pdf_supplement_records([_region()])
+    recette = recipe_from_operations(operations)
+
+    premier, _ = develop_document(natif, operations)
+    # Reconstruction depuis le seul couple natif + recette, sans réutiliser le
+    # tirage précédent : le développé doit revenir à l'empreinte près.
+    second, _ = develop_document(
+        DoclingDocument.model_validate_json(DOCUMENT.read_bytes()), operations
+    )
+
+    assert _fingerprint(second) == _fingerprint(premier)
+    assert recipe_sha256(recipe_from_operations(operations)) == recipe_sha256(recette)
+    # Une recette différente ne peut pas rendre le même tirage.
+    vide, _ = develop_document(DoclingDocument.model_validate_json(DOCUMENT.read_bytes()), [])
+    assert _fingerprint(vide) != _fingerprint(premier)
 
 
 def test_les_empreintes_de_recette_ignorent_les_metadonnees_de_derive() -> None:

@@ -317,16 +317,55 @@
     },
     {
       "bibliography": {
-        "authors": [],
+        "authors": [
+          "Matthew R. Kratter"
+        ],
         "identifiers": {
           "isbn10": [],
           "isbn13": [],
           "issn": []
         },
         "language": null,
-        "provenance": [],
+        "provenance": [
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                30
+              ],
+              "docling_ref": "#/texts/3",
+              "page": 2
+            },
+            "value": "BEAR MARKET TRADING STRATEGIES"
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                18
+              ],
+              "docling_ref": "#/texts/5",
+              "page": 2
+            },
+            "value": "MATTHEW R. KRATTER"
+          },
+          {
+            "kind": "source_text",
+            "locator": {
+              "charspan": [
+                0,
+                11
+              ],
+              "docling_ref": "#/texts/4",
+              "page": 2
+            },
+            "value": "2ND EDITION"
+          }
+        ],
         "publisher": null,
-        "title": null
+        "title": "Bear Market Trading Strategies"
       },
       "commercial_observations": [],
       "document_kind": "book",
@@ -374,7 +413,13 @@
               "published_date": "2021-01-27",
               "publisher": null,
               "rating": null,
-              "status": "candidate",
+              "review": {
+                "justification": "La page de titre prouve l'œuvre et son auteur. Le volume de Joann Giesel désigne un autre ouvrage. Celui de Matthew R. Kratter porte la même œuvre mais l'édition de 2018, alors que le fichier porte la mention « 2ND EDITION » : l'accepter attacherait une date d'édition de 2018 à une seconde édition. Aucun candidat ne décrit donc l'édition de ce PDF ; le titre et l'auteur restent prouvés par le texte source.",
+                "kind": "manual",
+                "reviewed_at": "2026-08-08",
+                "reviewer": "toba75"
+              },
+              "status": "rejected",
               "subtitle": "Bear Market Investing",
               "title": "Bear Market Trading Strategies Guidebook: a Must-Read for Bear Market Dummies",
               "volume_id": "scWrzgEACAAJ"
@@ -404,7 +449,13 @@
               "published_date": "2018-03-23",
               "publisher": "Independently Published",
               "rating": null,
-              "status": "candidate",
+              "review": {
+                "justification": "La page de titre prouve l'œuvre et son auteur. Le volume de Joann Giesel désigne un autre ouvrage. Celui de Matthew R. Kratter porte la même œuvre mais l'édition de 2018, alors que le fichier porte la mention « 2ND EDITION » : l'accepter attacherait une date d'édition de 2018 à une seconde édition. Aucun candidat ne décrit donc l'édition de ce PDF ; le titre et l'auteur restent prouvés par le texte source.",
+                "kind": "manual",
+                "reviewed_at": "2026-08-08",
+                "reviewer": "toba75"
+              },
+              "status": "rejected",
               "subtitle": null,
               "title": "Bear Market Trading Strategies",
               "volume_id": "PxM9tgEACAAJ"
@@ -422,8 +473,13 @@
       ],
       "resolution": {
         "candidate_id": null,
-        "proof": null,
-        "status": "candidate"
+        "proof": {
+          "justification": "La page de titre prouve l'œuvre et son auteur. Le volume de Joann Giesel désigne un autre ouvrage. Celui de Matthew R. Kratter porte la même œuvre mais l'édition de 2018, alors que le fichier porte la mention « 2ND EDITION » : l'accepter attacherait une date d'édition de 2018 à une seconde édition. Aucun candidat ne décrit donc l'édition de ce PDF ; le titre et l'auteur restent prouvés par le texte source.",
+          "kind": "manual",
+          "reviewed_at": "2026-08-08",
+          "reviewer": "toba75"
+        },
+        "status": "rejected"
       },
       "source_sha256": "9aff5d8d643604f1c7a414af82b6b97b4c55e9643655e2c8ecb42b0b9064189f",
       "temporality": {
@@ -5152,18 +5208,22 @@
     },
     {
       "bibliography": {
-        "authors": [],
+        "authors": [
+          "Thomas McCafferty"
+        ],
         "identifiers": {
           "isbn10": [
-            "0071382607",
             "0071345566",
+            "0071382607",
             "3127864450",
             "3129771042"
           ],
-          "isbn13": [],
+          "isbn13": [
+            "9780071345569"
+          ],
           "issn": []
         },
-        "language": null,
+        "language": "en",
         "provenance": [
           {
             "kind": "source_text",
@@ -5208,19 +5268,41 @@
               "docling_ref": "#/texts/1614",
               "page": 227
             }
+          },
+          {
+            "kind": "provider",
+            "observed_at": "2026-08-08T08:58:29+00:00",
+            "provider": "google_books",
+            "resource_id": "noQQ0_-a1ioC"
           }
         ],
-        "publisher": null,
-        "title": null
+        "publisher": "McGraw Hill Professional",
+        "title": "Understanding Hedged Scale Trading"
       },
       "commercial_observations": [],
       "document_kind": "book",
       "editorial_review": {
-        "limitations": "Le titre de fichier ne suffit pas à attribuer une autorité éditoriale.",
-        "reason": "fournisseur indisponible ; aucune valeur externe promue",
+        "authority_basis": {
+          "basis": [
+            "identité d'édition reliée à une preuve Google Books"
+          ],
+          "level": "domain_specific"
+        },
+        "domains": [
+          "portfolio_management",
+          "trading_practice"
+        ],
+        "justification": "La source est pertinente pour les domaines indiqués par son titre et sa notice ; la pertinence ne vaut pas validation universelle.",
+        "limitations": "Aucune mesure empirique ni revue exhaustive des arguments n'est ajoutée à cette étape.",
+        "method": "notice bibliographique et lecture du titre ; aucune autorité globale",
+        "proof": {
+          "kind": "manual",
+          "reviewer": "codex"
+        },
+        "review_flags": [],
         "reviewed_at": "2026-08-07",
         "reviewer": "codex",
-        "status": "not_assessable"
+        "status": "reviewed"
       },
       "file_name": "understanding-hedged-scale-trading.pdf",
       "lookup": {
@@ -5236,33 +5318,124 @@
           "isbn13": [],
           "issn": []
         },
-        "title": "understanding-hedged-scale-trading"
+        "publication_year_hint": null,
+        "publisher_hint": null,
+        "title": "understanding-hedged-scale-trading",
+        "title_variants": [
+          "understanding-hedged-scale-trading"
+        ]
       },
       "provider_observations": [
         {
           "candidates": [],
-          "error": {
-            "code": "provider_unavailable",
-            "message": "Google Books indisponible : HTTP Error 503: Service Unavailable"
-          },
-          "observed_at": "2026-08-07T15:12:07+00:00",
+          "invalid_candidate_count": 0,
+          "observed_at": "2026-08-08T08:58:29+00:00",
           "provider": "google_books",
           "request": {
             "kind": "isbn",
-            "query": "isbn:0071382607"
+            "query": "isbn:0071382607",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A0071382607&maxResults=40&printType=all"
           },
-          "status": "unavailable"
+          "status": "succeeded"
+        },
+        {
+          "candidates": [
+            {
+              "authors": [
+                "Thomas McCafferty"
+              ],
+              "candidate_id": "google_books:noQQ0_-a1ioC",
+              "categories": [
+                "Business & Economics"
+              ],
+              "identifiers": {
+                "isbn10": [
+                  "0071345566"
+                ],
+                "isbn13": [
+                  "9780071345569"
+                ],
+                "issn": []
+              },
+              "language": "en",
+              "matched_queries": [
+                "isbn:0071345566"
+              ],
+              "page_count": 283,
+              "proof": {
+                "kind": "provider",
+                "observed_at": "2026-08-08T08:58:29+00:00",
+                "provider": "google_books",
+                "resource_id": "noQQ0_-a1ioC"
+              },
+              "published_date": "2001",
+              "publisher": "McGraw Hill Professional",
+              "rating": null,
+              "status": "accepted",
+              "subtitle": null,
+              "title": "Understanding Hedged Scale Trading",
+              "volume_id": "noQQ0_-a1ioC"
+            }
+          ],
+          "invalid_candidate_count": 0,
+          "observed_at": "2026-08-08T08:58:29+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:0071345566",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A0071345566&maxResults=40&printType=all"
+          },
+          "status": "succeeded"
+        },
+        {
+          "candidates": [],
+          "invalid_candidate_count": 0,
+          "observed_at": "2026-08-08T08:58:30+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:3127864450",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A3127864450&maxResults=40&printType=all"
+          },
+          "status": "succeeded"
+        },
+        {
+          "candidates": [],
+          "invalid_candidate_count": 0,
+          "observed_at": "2026-08-08T08:58:31+00:00",
+          "provider": "google_books",
+          "request": {
+            "kind": "isbn",
+            "query": "isbn:3129771042",
+            "url": "https://www.googleapis.com/books/v1/volumes?q=isbn%3A3129771042&maxResults=40&printType=all"
+          },
+          "status": "succeeded"
         }
       ],
       "resolution": {
-        "candidate_id": null,
-        "proof": null,
-        "status": "unavailable"
+        "candidate_id": "google_books:noQQ0_-a1ioC",
+        "proof": {
+          "kind": "provider",
+          "match": "exact_isbn",
+          "observed_at": "2026-08-08T08:58:29+00:00",
+          "provider": "google_books",
+          "resource_id": "noQQ0_-a1ioC"
+        },
+        "status": "accepted"
       },
       "source_sha256": "1c7724b3b04d8f47dd66afdc46597402e80ffae8efca4cdf724ec4c1499ec09b",
       "temporality": {
         "content_revision": null,
-        "edition_published": null,
+        "edition_published": {
+          "precision": "year",
+          "proof": {
+            "kind": "provider",
+            "observed_at": "2026-08-08T08:58:29+00:00",
+            "provider": "google_books",
+            "resource_id": "noQQ0_-a1ioC"
+          },
+          "value": "2001"
+        },
         "work_first_published": null
       }
     },
