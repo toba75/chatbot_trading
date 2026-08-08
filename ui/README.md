@@ -1,7 +1,7 @@
 # Interface de conversion PDF
 
 Application Rails 8.1.3 sur Ruby 4.0.6. Elle convertit toutes les pages avec
-Docling Serve Granite CUDA puis qualifie automatiquement les expressions
+Docling Serve Granite puis qualifie automatiquement les expressions
 mathématiques à partir du PDF et du `DoclingDocument`. PostgreSQL stocke le
 métier et Solid Queue ; une base séparée de la même instance stocke Solid Cable.
 Aucun composant Rails ne s’exécute directement sur Windows.
@@ -15,8 +15,10 @@ Copy-Item .env.rails.example .env.rails
 docker compose --env-file .env.rails -f compose.rails.yaml build setup
 ```
 
-Le fichier `.env.docling-serve` et les actifs Granite qualifiés doivent déjà
-être présents selon le README racine.
+Le LaunchAgent Docling Serve Metal/MPS et ses actifs Granite qualifiés doivent
+déjà être présents selon le README racine. Dans Colima,
+`DOCLING_SERVE_URL=http://host.docker.internal:5001` conserve exactement le
+même contrat HTTP que le service CUDA.
 
 Les fichiers Active Storage sont montés directement sur l’hôte. Par défaut,
 `.env.rails.example` sépare `development` et `test` dans `data/development/active_storage`
@@ -43,12 +45,8 @@ environnement, par exemple `data\production\active_storage`.
 ## Démarrage
 
 ```powershell
-docker compose `
-  --env-file .env.docling-serve `
-  --env-file .env.rails `
-  -f compose.docling-serve.yaml `
-  -f compose.rails.yaml `
-  up -d --no-build docling-serve math-audit web jobs --wait
+docker compose --env-file .env.rails -f compose.rails.yaml `
+  up -d --no-build math-audit web jobs --wait
 ```
 
 L’interface est alors disponible sur `http://127.0.0.1:3000`. Le service
@@ -73,11 +71,7 @@ Cette commande convertit réellement le PDF de référence ; elle n’est pas un
 test rapide et ne doit pas être relancée après chaque modification locale.
 
 ```powershell
-docker compose `
-  --env-file .env.docling-serve `
-  --env-file .env.rails `
-  -f compose.docling-serve.yaml `
-  -f compose.rails.yaml `
+docker compose --env-file .env.rails -f compose.rails.yaml `
   --profile test run --rm test `
   bundle exec rails test:system test/system/pdf_conversion_test.rb
 ```

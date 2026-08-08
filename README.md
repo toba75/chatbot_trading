@@ -1,10 +1,21 @@
 # Pipeline documentaire minimal
 
 Ce dépôt contient le pipeline minimal complet : interface Rails, PostgreSQL,
-Solid Queue, Solid Cable, serveur industriel `docling-serve` CUDA et service de
+Solid Queue, Solid Cable, serveur `docling-serve` Granite et service de
 qualification mathématique fondé sur le PDF source.
 
-## Serveur Granite CUDA
+## Serveur Granite Metal/MPS sur Apple Silicon
+
+Le déploiement local macOS utilise `docling-serve` 1.28.0, Docling 2.115.0,
+`docling-core` 2.87.1 et le moteur MLX fourni par Docling. Le preset et les
+routes HTTP restent identiques au service CUDA ; aucune clé API n’est activée.
+Le LaunchAgent écoute sur le LAN au port 5001 et vérifie MPS, MLX et le modèle
+épinglé avant chaque démarrage.
+
+L’installation, l’exploitation et la qualification réelle sont décrites dans
+[le README du service Metal/MPS](services/docling-serve-mps/README.md).
+
+## Serveur Granite CUDA alternatif
 
 Le déploiement utilise l'image officielle Linux AMD64 :
 
@@ -35,7 +46,11 @@ Le test de qualification refuse ensuite tout fichier actif absent, ajouté ou
 dont l'empreinte diffère du manifeste. Les métadonnées `.cache` créées par
 Hugging Face ne participent pas au chargement du modèle.
 
-## Démarrage
+Pour ce déploiement CUDA, conserver
+`DOCLING_SERVE_URL=http://docling-serve:5001` dans `.env.rails` ; l’exemple
+versionné vise le service natif Metal/MPS exposé par l’hôte Colima.
+
+## Démarrage CUDA
 
 ```powershell
 Copy-Item .env.docling-serve.example .env.docling-serve
@@ -52,7 +67,7 @@ officiel initialise la pipeline PDF standard et ses modèles OCR, pas Granite ;
 il reste donc désactivé. Seule la qualification réelle ci-dessous prouve que le
 modèle Granite est chargé et utilisable sur CUDA.
 
-## Qualification réelle
+## Qualification réelle CUDA
 
 ```powershell
 uv sync --group dev
@@ -144,6 +159,8 @@ alignement.
 
 ## Fichiers principaux
 
+- [service Docling Serve Metal/MPS](services/docling-serve-mps/README.md)
+- [manifeste Granite MLX](config/granite-docling-258M-mlx.manifest.json)
 - [compose.docling-serve.yaml](compose.docling-serve.yaml)
 - [compose.rails.yaml](compose.rails.yaml)
 - [.env.docling-serve.example](.env.docling-serve.example)

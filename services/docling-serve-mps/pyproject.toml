@@ -1,0 +1,36 @@
+[project]
+name = "chatbot-trading-docling-serve-mps"
+version = "0.1.0"
+description = "Lanceur macOS natif de Docling Serve sur Metal/MPS"
+requires-python = "==3.12.8"
+dependencies = [
+    "docling-core==2.87.1",
+    "docling-jobkit==3.0.0",
+    "docling-serve==1.28.0",
+    "docling-slim==2.115.0",
+    "mlx==0.32.0",
+    "mlx-vlm==0.6.4",
+    "torch==2.13.0",
+    "torchvision==0.28.0",
+    "transformers==5.8.1",
+]
+
+[project.scripts]
+docling-serve-mps = "docling_serve_mps.service:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+    "pytest==8.4.2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docling_serve_mps"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: nécessite le LaunchAgent Docling Serve MPS réellement démarré"]

@@ -1,7 +1,8 @@
 # Processus de conversion et de qualification PDF
 
-Toutes les pages sont confiées à Docling Serve avec le preset Granite CUDA. Il
-n’existe ni routage de pages, ni moteur alternatif, ni fallback CPU.
+Toutes les pages sont confiées à Docling Serve avec le preset Granite. Sur
+Apple Silicon, `auto_inline` résout ce preset vers MLX sur Metal/MPS. Il
+n’existe ni routage de pages, ni moteur alternatif, ni fallback CPU configuré.
 
 ```mermaid
 flowchart LR
@@ -9,7 +10,7 @@ flowchart LR
     R --> P[("PostgreSQL")]
     R --> CQ["Solid Queue · conversions"]
     CQ --> C["ConvertDocumentJob"]
-    C -->|"PDF"| D["Docling Serve · Granite CUDA"]
+    C -->|"PDF"| D["Docling Serve · Granite MLX · Metal/MPS"]
     D -->|"DoclingDocument + exports"| C
     C --> P
     C --> MQ["Solid Queue · math_qualifications"]
@@ -456,7 +457,7 @@ sont jamais injectés ensemble.
 - `postgres` : données Rails, Solid Queue et base distincte Solid Cable ;
 - `web` : Rails, Turbo et Action Cable ;
 - `jobs` : files `default`, `conversions` et `math_qualifications` ;
-- `docling-serve` : image officielle CUDA épinglée par digest ;
+- `docling-serve` : LaunchAgent macOS natif, Granite via MLX sur Metal/MPS ;
 - `math-audit` : service Python borné, sans GPU, client du Gemma distant pour
   les seules régions contradictoires prouvées ;
 - `test` : Minitest et Chromium, exclusivement dans Docker.
