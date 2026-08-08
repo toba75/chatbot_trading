@@ -261,6 +261,132 @@ class MathCorrectionResultValidatorTest < ActiveSupport::TestCase
     end
   end
 
+  test "valide un document développé contenant un supplément PDF" do
+    native = {
+      "schema_name" => "DoclingDocument",
+      "pages" => { "1" => {} },
+      "body" => { "children" => [] },
+      "texts" => []
+    }
+    bbox = [ 10.0, 20.0, 30.0, 40.0 ]
+    reference = "#/texts/0"
+    supplement = {
+      "operation" => "pdf_supplement",
+      "kind" => "pdf_supplement",
+      "origin" => "pdf_supplement",
+      "status" => "accepted",
+      "target_id" => "supplement:1",
+      "region_id" => "supplement:1",
+      "page" => 1,
+      "bbox" => bbox,
+      "before" => "",
+      "after" => "x",
+      "source_text" => "x",
+      "source_tokens" => [ "x" ],
+      "source_signature" => [ "x" ],
+      "source_proof" => {
+        "region_id" => "supplement:1",
+        "candidate_link_reason" => { "code" => "docling_text_container_missing" },
+        "verdict" => "non_verifiable"
+      },
+      "derived_docling_ref" => reference,
+      "derived_charspan" => [ 0, 1 ]
+    }
+    derived = Marshal.load(Marshal.dump(native))
+    derived["texts"] << {
+      "self_ref" => reference,
+      "parent" => { "cref" => "#/body" },
+      "children" => [],
+      "content_layer" => "body",
+      "meta" => { "rag__development_origin" => "pdf_supplement" },
+      "label" => "formula",
+      "prov" => [
+        {
+          "page_no" => 1,
+          "bbox" => {
+            "l" => bbox[0], "t" => bbox[1], "r" => bbox[2], "b" => bbox[3],
+            "coord_origin" => "TOPLEFT"
+          },
+          "charspan" => [ 0, 1 ]
+        }
+      ],
+      "orig" => "x",
+      "text" => "x"
+    }
+    derived["body"]["children"] << { "cref" => reference }
+    derived_document = JSON.generate(derived)
+    native_document = JSON.generate(native)
+    recipe = {
+      "schema_version" => 1,
+      "operations" => [ supplement ]
+    }
+    recipe_sha256_value = MathCorrectionResultValidator.new(
+      Result.new(nil, nil, nil, nil, nil),
+      native_document: native_document
+    ).send(:recipe_sha256, recipe)
+    native_sha256 = Digest::SHA256.hexdigest(native_document)
+    derived_html = <<~HTML
+      <html><head><meta name="development-native-document-sha256" content="#{native_sha256}"><meta name="development-recipe-sha256" content="#{recipe_sha256_value}"></head><body>
+      <div class="page" id="page-1">
+        <span class="pdf-supplement" data-origin="pdf_supplement" data-supplement-id="supplement:1">
+          <span class="pdf-supplement-label">Supplément PDF dérivé</span>
+          <math data-origin="pdf_supplement" data-docling-ref="#/texts/0" data-docling-charspan="0:1"><mi>x</mi></math>
+        </span>
+      </div>
+      </body></html>
+    HTML
+    markdown = "<!-- native_document_sha256: #{native_sha256} -->\n" \
+      "<!-- recipe_sha256: #{recipe_sha256_value} -->\n" \
+      "> **Supplément PDF dérivé** — région supplement:1, page 1.\n>\n> $$x$$"
+    payload_summary = {
+      "status" => "corrected",
+      "regions" => 0,
+      "target_region_ids" => [],
+      "targets" => 0,
+      "accepted" => 0,
+      "accepted_regions" => 0,
+      "rejected" => 0,
+      "failed" => 0,
+      "supplements" => 1,
+      "development_operations" => 1,
+      "recipe_schema_version" => 1,
+      "recipe_sha256" => recipe_sha256_value,
+      "native_document_sha256" => native_sha256
+    }
+    corrections = JSON.generate(
+      "summary" => payload_summary,
+      "records" => [],
+      "supplements" => [ supplement ],
+      "recipe" => recipe
+    )
+    result = Result.new(
+      corrections: corrections,
+      correction_evidence: "PK",
+      derived_docling_document: derived_document,
+      derived_html: derived_html,
+      derived_markdown: markdown
+    )
+    correction = payload_summary.merge(
+      "engine" => { "model" => "gemma" },
+      "artifacts" => {
+        "corrections" => metadata(corrections),
+        "correction_evidence" => metadata("PK"),
+        "derived_docling_document" => metadata(derived_document),
+        "derived_html" => metadata(derived_html),
+        "derived_markdown" => metadata(markdown)
+      }
+    )
+
+    validated = MathCorrectionResultValidator.new(
+      result,
+      native_document: native_document
+    ).validate(correction, available_region_ids: [])
+
+    assert_equal 1, validated.fetch("supplements")
+    assert_equal 1, validated.fetch("development_operations")
+    assert_equal "corrected", validated.fetch("status")
+  end
+
   private
 
   def metadata(content)

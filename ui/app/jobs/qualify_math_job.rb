@@ -227,7 +227,7 @@ class QualifyMathJob < ApplicationJob
     )
     correction_records = JSON.parse(result.corrections).fetch("records")
       .select { |record| record["status"] == "accepted" }
-    html_document = correction["accepted"].positive? ?
+    html_document = correction["development_operations"].positive? ?
       result.derived_docling_document : native_document
     summary = {
       "regions" => regions,
@@ -250,7 +250,7 @@ class QualifyMathJob < ApplicationJob
       ),
       "correction" => correction
     }
-    expected_html_artifact = summary.dig("correction", "accepted").positive? ?
+    expected_html_artifact = summary.dig("correction", "development_operations").positive? ?
       "derived_html" : "native_page_html"
     invalid_report!(result) unless
       summary.dig("html_integrity", "artifact") == expected_html_artifact

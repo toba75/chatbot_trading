@@ -21,7 +21,15 @@ from pdf_math_audit.correction_proposals import (
     ProposalClient,
     propose_proven_latex,
 )
-from pdf_math_audit.derived_document import derive_document_and_page_html
+from pdf_math_audit.development import (
+    pdf_supplement_records,
+    recipe_from_operations,
+    recipe_sha256,
+)
+from pdf_math_audit.derived_document import (
+    derive_document_and_page_html,
+    render_developed_markdown,
+)
 from pdf_math_audit.events import ProgressCallback, progress_event
 from pdf_math_audit.gemma_proposal import ProposalError, propose_formula
 
@@ -56,8 +64,20 @@ def correct_document(
     proposal_client: ProposalClient = propose_formula,
     checkpoint_records: Path | None = None,
     checkpoint_evidence: Path | None = None,
+    native_document_sha256: str | None = None,
 ) -> CorrectionResult:
+    supplements = pdf_supplement_records(regions)
+    supplement_region_ids = {record["region_id"] for record in supplements}
     targets, region_count = correction_targets(regions, document)
+    targets = [
+        target
+        for target in targets
+        if not all(
+            region["region_id"] in supplement_region_ids
+            for region in target["regions"]
+        )
+    ]
+    region_count = sum(len(target["regions"]) for target in targets)
     records: list[dict[str, Any]] = []
     accepted: list[dict[str, Any]] = []
     engine_counts: dict[str, int] = {}
@@ -141,6 +161,8 @@ def correct_document(
                     engine_counts[engine] = engine_counts.get(engine, 0) + 1
                 record.update(
                     status="accepted",
+                    origin="correction",
+                    operation="correction",
                     proposals=attempts,
                     proposal=(proposals[0] if len(proposals) == 1 else None),
                     proposal_tokens=(
@@ -179,22 +201,22 @@ def correct_document(
                 )
 
     failed = sum(record["status"] == "failed" for record in records)
+    development_operations = [*accepted, *supplements]
+    recipe = recipe_from_operations(development_operations)
+    development_recipe_sha256 = recipe_sha256(recipe)
     if on_progress:
-        on_progress(progress_event("correction_export", 0, 1 if accepted else 0))
+        on_progress(
+            progress_event("correction_export", 0, 1 if development_operations else 0)
+        )
     if failed:
         status = "failed"
-    elif accepted:
+    elif accepted or supplements:
         status = "corrected"
     elif targets:
         status = "rejected"
     else:
         status = "not_required"
-    derived, derived_html = (
-        derive_document_and_page_html(document, accepted, pdf_path)
-        if accepted
-        else (None, None)
-    )
-    if on_progress and accepted:
+    if on_progress and development_operations:
         on_progress(progress_event("correction_export", 1, 1))
     summary = {
         "status": status,
@@ -207,6 +229,13 @@ def correct_document(
         "accepted_regions": sum(len(record["region_ids"]) for record in accepted),
         "rejected": sum(record["status"] == "rejected" for record in records),
         "failed": failed,
+        "supplements": len(supplements),
+        "supplement_region_ids": [
+            record["region_id"] for record in supplements
+        ],
+        "development_operations": len(development_operations),
+        "recipe_schema_version": recipe["schema_version"],
+        "recipe_sha256": development_recipe_sha256,
         "engine": {
             "model": config.model,
             "dpi": config.dpi,
@@ -216,13 +245,34 @@ def correct_document(
             "vision_calls": vision_calls,
         },
     }
-    records_bytes = (
-        json.dumps(
-            {"summary": summary, "records": records}, ensure_ascii=False, indent=2
+    if native_document_sha256 is not None:
+        summary["native_document_sha256"] = native_document_sha256
+    records_bytes = None
+    if development_operations:
+        derived, derived_html = derive_document_and_page_html(
+            document,
+            development_operations,
+            pdf_path,
+            native_document_sha256=native_document_sha256,
+            recipe_sha256_value=development_recipe_sha256,
         )
-        + "\n"
+        derived_markdown = render_developed_markdown(
+            derived,
+            development_operations,
+            native_document_sha256=native_document_sha256,
+            recipe_sha256_value=development_recipe_sha256,
+        )
+    persisted_recipe = recipe_from_operations(development_operations)
+    payload = {
+        "summary": summary,
+        "records": records,
+        "supplements": supplements,
+        "recipe": persisted_recipe,
+    }
+    records_bytes = (
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     ).encode("utf-8")
-    if derived is None:
+    if not development_operations:
         return CorrectionResult(
             summary, records_bytes, evidence.getvalue(), None, None, None
         )
@@ -233,5 +283,5 @@ def correct_document(
         evidence.getvalue(),
         document_bytes,
         derived_html,
-        derived.export_to_markdown().encode("utf-8"),
+        derived_markdown,
     )

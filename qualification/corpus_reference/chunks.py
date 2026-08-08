@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -28,6 +29,15 @@ from typing import Any
 
 from docling_core.types.doc import ContentLayer, DocItemLabel, DoclingDocument
 
+from pdf_math_audit.development import (
+    DEVELOPMENT_ORIGINS,
+    develop_document,
+    item_development_origin,
+    operation_kind,
+    pdf_supplement_records,
+    recipe_from_operations,
+    recipe_sha256,
+)
 from pdf_math_audit.inline_math import carries_inline_math, inline_math_spans
 from qualification.corpus_reference.manifest import MANIFEST
 from qualification.corpus_reference.coverage import WORK
@@ -38,7 +48,7 @@ from qualification.source_catalog.registry import (
     verify_catalog,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 FLAGS = ("proven", "corroborated", "unverified", "contradicted")
 CHUNK_BUDGET_CHARACTERS = 1_800
 _INEFFECTIVE_CHARACTERS = frozenset(" \t$")
@@ -59,16 +69,49 @@ def _top_left_bbox(
     return page, [box.l, box.t, box.r, box.b]
 
 
-def _linked_sources(report: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+def _linked_sources(
+    report: dict[str, Any], operations: list[dict[str, Any]]
+) -> dict[str, list[dict[str, Any]]]:
     sources: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+    derived_refs = {
+        operation.get("docling_ref"): operation.get("derived_docling_ref")
+        for operation in operations
+        if operation.get("operation") == "correction"
+        and operation.get("docling_ref")
+        and operation.get("derived_docling_ref")
+    }
     for region in report["alignment"]["pdf_source_math_regions"]:
         if (
             region.get("candidate_link_status") == "linked"
             and region.get("docling_ref")
             and region.get("candidate_charspan")
         ):
-            sources[region["docling_ref"]].append(region)
+            source = region
+            derived_ref = derived_refs.get(region["docling_ref"])
+            if derived_ref:
+                source = region | {"docling_ref": derived_ref}
+            sources[source["docling_ref"]].append(source)
     return sources
+
+
+def _item_origin(item: Any, operations: list[dict[str, Any]]) -> str:
+    for operation in operations:
+        reference = operation.get("derived_docling_ref") or operation.get("docling_ref")
+        if reference != item.self_ref:
+            continue
+        if operation.get("operation") == "correction":
+            return "correction"
+        if operation_kind(operation) == "pdf_supplement":
+            return "pdf_supplement"
+    return item_development_origin(item)
+
+
+def _body_items(document: DoclingDocument) -> list[Any]:
+    return [
+        item
+        for item, _level in document.iterate_items()
+        if item.content_layer == ContentLayer.BODY and hasattr(item, "text")
+    ]
 
 
 def _region_boxes(report: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -162,6 +205,7 @@ def _item_formulas(
     item: Any,
     document: DoclingDocument,
     offset: int,
+    origin: str,
     sources: dict[str, list[dict[str, Any]]],
     boxes: dict[str, list[dict[str, Any]]],
     fallback: dict[str, Any],
@@ -184,6 +228,7 @@ def _item_formulas(
                 "charspan": [offset + start, offset + end],
                 "docling_ref": item.self_ref,
                 "item_charspan": [start, end],
+                "origin": origin,
                 "flag": flag,
                 "evidence": evidence,
                 "provenance": _formula_provenance(
@@ -195,8 +240,24 @@ def _item_formulas(
 
 
 def validate_chunk(chunk: dict[str, Any]) -> None:
-    """Refuse un chunk dont une formule n'a pas de drapeau ou de provenance."""
+    """Refuse un chunk dont le contenu ou la preuve est incomplet."""
+    items = chunk.get("items")
+    if chunk.get("text") and (not isinstance(items, list) or not items):
+        raise ValueError(f"Contenu sans origine dans {chunk['chunk_id']}")
+    for item in items or []:
+        if not isinstance(item, dict):
+            raise ValueError(f"Item sans origine valide dans {chunk['chunk_id']}")
+        if item.get("origin") not in DEVELOPMENT_ORIGINS:
+            raise ValueError(
+                f"Item sans origine valide dans {chunk['chunk_id']} : "
+                f"{item.get('origin')!r}"
+            )
     for formula in chunk["formulas"]:
+        if formula.get("origin") not in DEVELOPMENT_ORIGINS:
+            raise ValueError(
+                f"Formule sans origine valide dans {chunk['chunk_id']} : "
+                f"{formula.get('origin')!r}"
+            )
         if formula.get("flag") not in FLAGS:
             raise ValueError(
                 f"Formule sans drapeau valide dans {chunk['chunk_id']} : "
@@ -220,10 +281,12 @@ def build_chunks(
     report: dict[str, Any],
     entry: dict[str, Any],
     source_projection: dict[str, Any] | None = None,
-) -> list[dict[str, Any]]:
+    development_operations: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
     if source_projection is not None and source_projection.get("source_sha256") != entry["sha256"]:
         raise ValueError("La projection de source ne correspond pas au manifeste")
-    sources = _linked_sources(report)
+    operations = development_operations or []
+    sources = _linked_sources(report, operations)
     boxes = _region_boxes(report)
     chunks: list[dict[str, Any]] = []
     unlocatable: list[str] = []
@@ -263,6 +326,7 @@ def build_chunks(
                     "docling_ref": item.self_ref,
                     "label": str(item.label.value),
                     "charspan": [offset, offset + len(item.text)],
+                    "origin": _item_origin(item, operations),
                 }
                 for (item, _located), offset in zip(current, offsets)
             ],
@@ -273,14 +337,20 @@ def build_chunks(
             formula
             for (item, _located), offset in zip(current, offsets)
             for formula in _item_formulas(
-                item, document, offset, sources, boxes, chunk["provenance"]
+                item,
+                document,
+                offset,
+                _item_origin(item, operations),
+                sources,
+                boxes,
+                chunk["provenance"],
             )
         ]
         validate_chunk(chunk)
         chunks.append(chunk)
         current.clear()
 
-    for item in document.texts:
+    for item in _body_items(document):
         if item.content_layer != ContentLayer.BODY:
             continue
         if not carries_inline_math(item) and item.label not in (
@@ -306,20 +376,117 @@ def build_chunks(
     return chunks, unlocatable
 
 
+def _development_operations(
+    directory: Path, report: dict[str, Any]
+) -> list[dict[str, Any]]:
+    regions = report["alignment"]["pdf_source_math_regions"]
+    supplements = pdf_supplement_records(regions)
+    correction_path = directory / "corrections.json"
+    if not correction_path.exists():
+        correction = report.get("correction") or {}
+        if correction.get("accepted", 0) or correction.get("status") in {
+            "corrected",
+            "failed",
+        }:
+            raise FileNotFoundError(
+                "corrections.json absent alors que le rapport annonce une correction"
+            )
+        return supplements
+
+    payload = json.loads(correction_path.read_text(encoding="utf-8"))
+    records = payload.get("records")
+    if not isinstance(records, list) or not all(
+        isinstance(record, dict) for record in records
+    ):
+        raise ValueError("corrections.json sans liste de records valide")
+    accepted = [record for record in records if record.get("status") == "accepted"]
+    announced_accepted = (report.get("correction") or {}).get("accepted")
+    if announced_accepted is not None and announced_accepted != len(accepted):
+        raise ValueError("Le nombre de corrections acceptées diverge du rapport")
+    payload_accepted = (payload.get("summary") or {}).get("accepted")
+    if payload_accepted is not None and payload_accepted != len(accepted):
+        raise ValueError("Le nombre de corrections acceptées diverge de corrections.json")
+    recipe = payload.get("recipe")
+    if recipe is not None:
+        if not isinstance(recipe, dict) or recipe.get("schema_version") != 1:
+            raise ValueError("Version de recette de développement inconnue")
+        recipe_operations = recipe.get("operations")
+        if not isinstance(recipe_operations, list) or not all(
+            isinstance(operation, dict) for operation in recipe_operations
+        ):
+            raise ValueError("Recette de développement sans liste d'opérations")
+        expected_ids = [record["region_id"] for record in supplements]
+        actual_ids = [
+            operation.get("region_id")
+            for operation in recipe_operations
+            if operation_kind(operation) == "pdf_supplement"
+        ]
+        if actual_ids != expected_ids or len(actual_ids) != len(set(actual_ids)):
+            raise ValueError(
+                "La recette de développement ne couvre pas exactement les "
+                "suppléments du rapport"
+            )
+        expected_correction_ids = [record["target_id"] for record in accepted]
+        actual_correction_ids = [
+            operation.get("target_id")
+            for operation in recipe_operations
+            if operation.get("operation") == "correction"
+        ]
+        if actual_correction_ids != expected_correction_ids:
+            raise ValueError(
+                "La recette de développement ne couvre pas exactement les "
+                "corrections acceptées"
+            )
+        if len(recipe_operations) != len(accepted) + len(supplements):
+            raise ValueError("Le nombre d'opérations de la recette est incohérent")
+        return recipe_operations
+
+    return [*accepted, *supplements]
+
+
+def _development_artifacts(
+    document: DoclingDocument,
+    operations: list[dict[str, Any]],
+) -> tuple[DoclingDocument, dict[str, Any], str]:
+    recipe = recipe_from_operations(operations)
+    recipe_digest = recipe_sha256(recipe)
+    developed, supplements = develop_document(document, operations)
+    for record, item in supplements:
+        record["derived_docling_ref"] = item.self_ref
+        record["derived_charspan"] = [0, len(item.text)]
+    return developed, recipe, recipe_digest
+
+
 def export_book(
     entry: dict[str, Any],
     work: Path,
     catalog_entry: dict[str, Any] | None = None,
 ) -> collections.Counter[str]:
     directory = work / entry["sha256"][:12]
-    document = DoclingDocument.model_validate_json(
-        (directory / "docling-document.json").read_text(encoding="utf-8")
-    )
+    native_bytes = (directory / "docling-document.json").read_bytes()
+    native_sha256 = hashlib.sha256(native_bytes).hexdigest()
+    document = DoclingDocument.model_validate_json(native_bytes)
     report = json.loads((directory / "report.json").read_text(encoding="utf-8"))
+    announced_native_sha256 = (
+        report.get("docling_document", {}).get("sha256")
+        or report.get("contract", {}).get("docling_document_sha256")
+    )
+    if announced_native_sha256 is not None and announced_native_sha256 != native_sha256:
+        raise ValueError("L'empreinte du document natif diverge du rapport")
+    operations = _development_operations(directory, report)
+    developed, recipe, recipe_digest = _development_artifacts(document, operations)
+    announced_recipe_sha256 = (report.get("development") or {}).get("recipe_sha256")
+    if announced_recipe_sha256 is not None and announced_recipe_sha256 != recipe_digest:
+        raise ValueError("L'empreinte de la recette diverge du rapport")
     source_projection = stable_projection(catalog_entry) if catalog_entry else None
     if source_projection and source_projection["source_sha256"] != entry["sha256"]:
         raise ValueError("Le registre de sources ne correspond pas au manifeste")
-    chunks, unlocatable = build_chunks(document, report, entry, source_projection)
+    chunks, unlocatable = build_chunks(
+        developed, report, entry, source_projection, operations
+    )
+    origin_counts = collections.Counter(
+        item["origin"] for chunk in chunks for item in chunk["items"]
+    )
     header = {
         "type": "header",
         "schema_version": SCHEMA_VERSION,
@@ -327,9 +494,27 @@ def export_book(
             "analyzer_version": report.get("analyzer_version"),
             "capability_profile": report.get("capability_profile"),
         },
-        "document": {"name": entry["name"], "sha256": entry["sha256"]},
+        "document": {
+            "name": entry["name"],
+            "sha256": entry["sha256"],
+            "native_document_sha256": native_sha256,
+        },
+        "native_document_sha256": native_sha256,
+        "recipe_sha256": recipe_digest,
+        "development": {
+            "recipe_schema_version": recipe["schema_version"],
+            "recipe_sha256": recipe_digest,
+            "operations": len(operations),
+            "origin_counts": {
+                origin: origin_counts.get(origin, 0)
+                for origin in DEVELOPMENT_ORIGINS
+            },
+        },
         "chunks": len(chunks),
         "unlocatable_items": unlocatable,
+        "origin_counts": {
+            origin: origin_counts.get(origin, 0) for origin in DEVELOPMENT_ORIGINS
+        },
     }
     if source_projection is not None:
         header["source_catalog"] = {
@@ -339,9 +524,11 @@ def export_book(
     with (directory / "chunks.jsonl").open("w", encoding="utf-8") as output:
         for record in [header, *chunks]:
             output.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
-    return collections.Counter(
+    counts = collections.Counter(
         formula["flag"] for chunk in chunks for formula in chunk["formulas"]
     )
+    counts.update({f"origin:{origin}": count for origin, count in origin_counts.items()})
+    return counts
 
 
 def main(argv: list[str] | None = None) -> int:

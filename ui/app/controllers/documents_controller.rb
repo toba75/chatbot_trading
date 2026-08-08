@@ -138,7 +138,16 @@ class DocumentsController < ApplicationController
   def markdown_preview
     document = kept_document
     attempt = document.current_attempt
-    return head :conflict unless attempt.succeeded? && attempt.markdown.attached?
+    qualification = attempt.current_math_qualification
+    developed = qualification&.succeeded? && qualification.current_contract? &&
+      qualification.derived_markdown.attached?
+    return head :conflict unless attempt.succeeded? && (developed || attempt.markdown.attached?)
+
+    if developed
+      set_preview_headers("sandbox; default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'")
+      return send_data qualification.derived_markdown.download,
+        type: "text/markdown", disposition: "inline"
+    end
 
     redirect_to rails_blob_path(attempt.markdown, disposition: "inline")
   end

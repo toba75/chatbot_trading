@@ -19,6 +19,13 @@ from pdf_math_audit.contract import (
     sha256_argument,
 )
 from pdf_math_audit.correction import CorrectionConfig, correct_document
+from pdf_math_audit.development import (
+    DEVELOPMENT_ORIGINS,
+    development_origin_counts,
+    pdf_supplement_records,
+    recipe_from_operations,
+    recipe_sha256,
+)
 from pdf_math_audit.derived_document import derive_document_and_page_html
 from pdf_math_audit.html_integrity import audit_page_html
 
@@ -195,6 +202,8 @@ def main() -> int:
         "docling_document_sha256": docling_sha256,
     }
     report["alignment"] = alignment.finalize(report, on_progress=_emit)
+    empty_recipe = recipe_from_operations([])
+    empty_recipe_sha256 = recipe_sha256(empty_recipe)
     if correction_enabled:
         correction = correct_document(
             args.pdf,
@@ -211,11 +220,16 @@ def main() -> int:
             on_progress=_emit,
             checkpoint_records=args.correction_checkpoint_records,
             checkpoint_evidence=args.correction_checkpoint_evidence,
+            native_document_sha256=docling_sha256,
         )
         args.correction_records.write_bytes(correction.records)
         args.correction_evidence.write_bytes(correction.evidence)
         _native_document, native_page_html = derive_document_and_page_html(
-            document, [], args.pdf
+            document,
+            [],
+            args.pdf,
+            native_document_sha256=docling_sha256,
+            recipe_sha256_value=empty_recipe_sha256,
         )
         args.native_page_html.write_bytes(native_page_html)
         report["native_page_html"] = {
@@ -271,6 +285,26 @@ def main() -> int:
                 for name, path in correction_artifacts.items()
             }
         }
+        correction_payload = json.loads(correction.records)
+        development_recipe = correction_payload["recipe"]
+        development_operations = development_recipe["operations"]
+        operation_origin_counts = {
+            origin: sum(
+                operation.get("operation") == origin
+                for operation in development_operations
+            )
+            for origin in DEVELOPMENT_ORIGINS
+            if origin != "transcription"
+        }
+        operation_origin_counts["transcription"] = 0
+        report["development"] = {
+            "native_document_sha256": docling_sha256,
+            "recipe_schema_version": development_recipe["schema_version"],
+            "recipe_sha256": recipe_sha256(development_recipe),
+            "operations": len(development_operations),
+            "origin_counts": development_origin_counts(document, development_operations),
+            "operation_origin_counts": operation_origin_counts,
+        }
     else:
         report["correction"] = {
             "status": "not_requested",
@@ -281,6 +315,22 @@ def main() -> int:
             "rejected": 0,
             "failed": 0,
             "artifacts": {},
+        }
+        supplements = pdf_supplement_records(
+            report["alignment"]["pdf_source_math_regions"]
+        )
+        supplement_recipe = recipe_from_operations(supplements)
+        operation_origin_counts = {
+            origin: (len(supplements) if origin == "pdf_supplement" else 0)
+            for origin in DEVELOPMENT_ORIGINS
+        }
+        report["development"] = {
+            "native_document_sha256": docling_sha256,
+            "recipe_schema_version": supplement_recipe["schema_version"],
+            "recipe_sha256": recipe_sha256(supplement_recipe),
+            "operations": len(supplements),
+            "origin_counts": development_origin_counts(document, supplements),
+            "operation_origin_counts": operation_origin_counts,
         }
     report["evidence"] = {
         "bytes": len(evidence_bytes),

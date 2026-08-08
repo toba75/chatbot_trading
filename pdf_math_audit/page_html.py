@@ -55,6 +55,19 @@ body > table > tbody > tr > td:last-child { width: 100%; }
 }
 .page img, .page svg { max-width: 100%; height: auto; }
 .blank-page { color: #666; }
+.pdf-supplement {
+  display: block;
+  margin: 0.75rem 0;
+  padding: 0.5rem;
+  border: 2px solid #9a6700;
+  background: #fff8c5;
+}
+.pdf-supplement-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #6b4f00;
+  font: 600 0.85rem sans-serif;
+}
 </style>
 """
 

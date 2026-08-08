@@ -118,6 +118,17 @@ def test_cli_ecrit_le_rapport_et_publie_la_progression(tmp_path: Path) -> None:
         "source_sha256": hashlib.sha256(pdf_path.read_bytes()).hexdigest(),
         "docling_document_sha256": hashlib.sha256(docling_bytes).hexdigest(),
     }
+    assert report["development"]["native_document_sha256"] == hashlib.sha256(
+        docling_bytes
+    ).hexdigest()
+    assert report["development"]["recipe_schema_version"] == 1
+    assert len(report["development"]["recipe_sha256"]) == 64
+    assert report["development"]["operations"] == 0
+    assert report["development"]["origin_counts"] == {
+        "transcription": 0,
+        "correction": 0,
+        "pdf_supplement": 0,
+    }
     assert report["alignment"]["coverage"]["regions_total"] == 0
     assert report["evidence"] == {
         "bytes": evidence_path.stat().st_size,

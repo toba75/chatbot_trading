@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from docling_core.types.doc import DoclingDocument
 
+from pdf_math_audit.development import develop_document, pdf_supplement_records
 from qualification.corpus_reference.chunks import (
     build_chunks,
     main,
@@ -189,7 +190,11 @@ def test_refuse_une_formule_sans_drapeau_ou_sans_provenance() -> None:
     chunk = {
         "chunk_id": "abc:00000",
         "formulas": [
-            {"flag": "unverified", "provenance": {"page": 1, "bbox": [1, 2, 3, 4]}}
+            {
+                "origin": "transcription",
+                "flag": "unverified",
+                "provenance": {"page": 1, "bbox": [1, 2, 3, 4]},
+            }
         ],
     }
     validate_chunk(chunk)
@@ -202,6 +207,83 @@ def test_refuse_une_formule_sans_drapeau_ou_sans_provenance() -> None:
     chunk["formulas"][0]["provenance"] = {"page": 1}
     with pytest.raises(ValueError, match="sans provenance"):
         validate_chunk(chunk)
+
+    missing_origin = {
+        "chunk_id": "abc:00000",
+        "text": "x",
+        "items": [{"origin": None}],
+        "formulas": [],
+    }
+    with pytest.raises(ValueError, match="Item sans origine"):
+        validate_chunk(missing_origin)
+
+    for items in (None, []):
+        without_items = {
+            "chunk_id": "abc:00000",
+            "text": "x",
+            "items": items,
+            "formulas": [],
+        }
+        with pytest.raises(ValueError, match="Contenu sans origine"):
+            validate_chunk(without_items)
+
+
+def test_un_supplement_est_publie_avec_son_origine_sans_devenir_prouve() -> None:
+    document = _document(_text(0, "Contexte localisé."))
+    region = {
+        "region_id": "pdf-source:1:1",
+        "page": 1,
+        "bbox": [20.0, 20.0, 30.0, 30.0],
+        "source_glyph_text": "x",
+        "source_canonical_tokens": ["x"],
+        "source_relation_signature": ["x"],
+        "candidate_link_status": "not_linked",
+        "candidate_link_reason": {"code": "docling_text_container_missing"},
+        "verdict": "contradicted",
+        "semantic_status": "not_established",
+    }
+    operations = pdf_supplement_records([region])
+    developed, created = develop_document(document, operations)
+    for record, item in created:
+        record["derived_docling_ref"] = item.self_ref
+        record["derived_charspan"] = [0, len(item.text)]
+
+    chunks, _unlocatable = build_chunks(
+        developed, _report(region), ENTRY, development_operations=operations
+    )
+
+    formula = chunks[0]["formulas"][0]
+    assert formula["origin"] == "pdf_supplement"
+    assert formula["flag"] == "unverified"
+    assert any(
+        item["origin"] == "pdf_supplement" for item in chunks[0]["items"]
+    )
+
+
+def test_une_correction_reconstruite_porte_son_origine_et_sa_preuve() -> None:
+    document = _document(_text(0, "Valeur $x$ ici."))
+    operation = {
+        "operation": "correction",
+        "kind": "replacement",
+        "target_id": "correction:1",
+        "docling_ref": "#/texts/0",
+        "derived_docling_ref": "#/texts/0",
+        "charspan": [7, 10],
+        "derived_charspan": [7, 10],
+        "before": "$x$",
+        "after": "$y$",
+        "mathml": '<math data-correction-id="correction:1"><mi>y</mi></math>',
+    }
+    developed, _created = develop_document(document, [operation])
+    report = _report(_source("#/texts/0", [7, 10], "matching"))
+
+    chunks, _unlocatable = build_chunks(
+        developed, report, ENTRY, development_operations=[operation]
+    )
+
+    assert chunks[0]["items"][0]["origin"] == "correction"
+    assert chunks[0]["formulas"][0]["origin"] == "correction"
+    assert chunks[0]["formulas"][0]["flag"] == "proven"
 
 
 def test_le_budget_de_caracteres_coupe_sans_scinder_un_item() -> None:
@@ -240,11 +322,20 @@ def test_l_export_ecrit_l_en_tete_et_les_chunks(tmp_path: Path) -> None:
         for line in (directory / "chunks.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert lines[0]["type"] == "header"
-    assert lines[0]["schema_version"] == 1
+    assert lines[0]["schema_version"] == 2
     assert lines[0]["document"]["sha256"] == "f" * 64
+    assert len(lines[0]["native_document_sha256"]) == 64
+    assert len(lines[0]["recipe_sha256"]) == 64
+    assert lines[0]["origin_counts"] == {
+        "transcription": 1,
+        "correction": 0,
+        "pdf_supplement": 0,
+    }
     assert lines[0]["chunks"] == len(lines) - 1
     assert lines[1]["type"] == "chunk"
     assert lines[1]["formulas"][0]["flag"] == "proven"
+    assert lines[1]["formulas"][0]["origin"] == "transcription"
+    assert lines[1]["items"][0]["origin"] == "transcription"
 
 
 def test_la_projection_source_est_stable_et_sans_signal_commercial() -> None:

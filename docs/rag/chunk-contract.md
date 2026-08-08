@@ -1,4 +1,4 @@
-# Contrat des chunks de l'index RAG — schéma version 1
+# Contrat des chunks de l'index RAG — schéma version 2
 
 Ce contrat est produit par `qualification/corpus_reference/chunks.py` (export :
 `uv run python -m qualification.corpus_reference.chunks export`). Les fichiers
@@ -10,9 +10,19 @@ le dépôt : ils contiennent le texte d'ouvrages sous droit d'auteur.
 Un fichier par livre, en JSON Lines. La première ligne est un en-tête :
 
 ```json
-{"type": "header", "schema_version": 1,
+{"type": "header", "schema_version": 2,
  "contract": {"analyzer_version": "…", "capability_profile": "…"},
- "document": {"name": "…", "sha256": "…"}, "chunks": N,
+ "document": {"name": "…", "sha256": "…",
+              "native_document_sha256": "…"},
+ "native_document_sha256": "…", "recipe_sha256": "…",
+ "development": {"recipe_schema_version": 1, "recipe_sha256": "…",
+                 "operations": N,
+                 "origin_counts": {"transcription": N,
+                                    "correction": N,
+                                    "pdf_supplement": N}},
+ "origin_counts": {"transcription": N, "correction": N,
+                    "pdf_supplement": N},
+ "chunks": N,
  "unlocatable_items": ["#/texts/1062", "…"]}
 ```
 
@@ -28,15 +38,32 @@ Chaque ligne suivante est un chunk :
  "source": {"source_sha256": "…", "document_kind": "book",
              "source_catalog_schema_version": 1,
              "source_catalog_entry_sha256": "…", "…": "projection stable"},
- "items": [{"docling_ref": "#/texts/68", "label": "text", "charspan": [a, b]}],
+ "items": [{"docling_ref": "#/texts/68", "label": "text",
+            "charspan": [a, b],
+            "origin": "transcription|correction|pdf_supplement"}],
  "formulas": [{"kind": "inline|display", "charspan": [a, b],
                "docling_ref": "#/texts/68", "item_charspan": [a, b],
+               "origin": "transcription|correction|pdf_supplement",
                "flag": "proven|corroborated|unverified|contradicted",
                "evidence": {"conformant": n, "contradicted": n, "other": n,
                              "coverage": r},
                "provenance": {"page": 9, "bbox": [l, t, r, b],
                                "precision": "region|item|chunk"}}]}
 ```
+
+Le texte de chaque chunk est construit depuis le **document développé** : une
+copie du `DoclingDocument` natif à laquelle la recette ordonnée applique les
+corrections acceptées et les `pdf_supplement`. Le PDF et le document natif
+restent les autorités conservées ; le natif n'est jamais modifié. La recette
+vide est l'identité et les empreintes `native_document_sha256` et
+`recipe_sha256` épinglent exactement le document source et son développement.
+
+Chaque item publié déclare son origine : `transcription` pour le texte natif,
+`correction` pour un contenu remplacé par une correction acceptée et
+`pdf_supplement` pour un texte glyphique du PDF absent de la transcription.
+Un supplément conserve sa région et sa preuve dans la recette ; il reste
+`unverified` pour la preuve mathématique et ne peut pas devenir `proven` par
+son seul statut d'origine.
 
 Toutes les boîtes sont en points PDF, origine **TOPLEFT**, directement
 utilisables pour produire un crop de citation (`fitz.Rect` sur la page
@@ -87,10 +114,11 @@ verdict du pipeline est la seule autorité :
 - `proven` : au moins une région `conformant_within_scope`, aucune
   contradiction, et les régions conformes couvrent **l'intégralité** des
   caractères effectifs de la formule (tout sauf espaces et `$`). Cette règle
-  n'est pas un seuil choisi : sur les 37 livres exportés, 93 formules portent
-  des preuves conformes sans contradiction — 23 à couverture exactement 1,0,
-  aucune entre 0,55 et 1,0, 70 en dessous. Une couverture partielle reste
-  `unverified`, le détail (`evidence.coverage`) étant conservé.
+  n'est pas un seuil choisi : l'export réel des 37 livres publie 5 708 formules,
+  dont 23 `proven`, 90 `contradicted` et 5 595 `unverified`. Les 789 formules
+  issues d'un `pdf_supplement` restent `unverified`, quel que soit leur verdict
+  de source ; une couverture partielle reste `unverified`, le détail
+  (`evidence.coverage`) étant conservé.
 - `corroborated` : réservé à l'accord d'un second modèle indépendant mesuré par
   l'étape 6 du plan 004. **Jamais émis par cet exporteur** ; aucun drapeau ne
   surclasse la preuve.
@@ -100,10 +128,12 @@ verdict du pipeline est la seule autorité :
 
 ## Validation
 
-`validate_chunk` refuse tout chunk dont une formule n'a pas un drapeau de
-l'énumération ou n'a pas de provenance complète (page et boîte) ; l'export
-échoue alors explicitement. Le contre-exemple est un test
-(`test_refuse_une_formule_sans_drapeau_ou_sans_provenance`).
+`validate_chunk` refuse tout chunk dont le texte n'est pas porté par au moins
+un item avec une origine de l'énumération, ou dont un item ou une formule n'a
+pas cette origine. Il refuse aussi une formule sans drapeau de l'énumération
+ou sans provenance complète (page et boîte) ; l'export échoue alors
+explicitement. Les contre-exemples sont couverts par
+`test_refuse_une_formule_sans_drapeau_ou_sans_provenance`.
 
 ## Évolution
 

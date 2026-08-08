@@ -345,6 +345,15 @@ sérialisation MathML native reste l'unique autorité de rendu. Un `$` isolé,
 notamment dans une unité monétaire telle que `M$`, reste du texte. Les formes
 monétaires `$5` et `10 M$` sont écartées avant l'appariement ; une formule
 adjacente telle que `$x_i$` reste néanmoins reconnue.
+
+Les régions PDF dont le verdict est `docling_text_container_missing` sont
+ajoutées au développement comme `pdf_supplement` uniquement quand le texte
+glyphique, la boîte et les jetons de preuve sont présents dans le rapport. Le
+document natif reste l'entrée immuable ; la recette ordonnée est persistée avec
+les empreintes SHA-256 du natif et de la recette. Le supplément porte l'origine
+`pdf_supplement`, conserve le verdict de preuve et ne peut donc pas devenir
+`proven` par son insertion. L'HTML et le Markdown développés le signalent
+visiblement comme contenu absent de la transcription.
 Quand Docling place le caractère Unicode U+0338 avant l'opérateur qu'il nie
 (`γ ̸ = 0`), la vue HTML rattache déterministement la barre à cet opérateur par
 composition Unicode (`γ ≠ 0`). Le `DoclingDocument` canonique reste inchangé ;
@@ -465,7 +474,8 @@ bibliographie. Le rejet explicite conserve la bibliographie précédente et
 marque la résolution manuelle.
 
 Le visualiseur à onglets charge à la demande un seul format Docling : l’HTML
-corrigé lorsqu’il existe, l’HTML original, le Markdown brut ou une projection
+corrigé lorsqu’il existe, l’HTML original, le Markdown développé lorsqu’il
+existe (sinon le Markdown natif) ou une projection
 JSON de la page PDF courante. Cette
 projection contient l’objet `page` et les `texts`, `pictures`, `tables`,
 `key_value_items` et `form_items` dont `prov.page_no` correspond. Son bloc

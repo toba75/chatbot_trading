@@ -22,6 +22,7 @@ from pdf_math_audit.correction_targets import correction_targets, ineligibility
 from pdf_math_audit.derived_document import (
     derive_document,
     derive_document_and_page_html,
+    render_developed_markdown,
 )
 from pdf_math_audit.gemma_proposal import Proposal, ProposalError
 from pdf_math_audit.mathml_candidate import candidate_signature, candidate_tokens
@@ -105,7 +106,20 @@ def test_cree_un_document_derive_sans_modifier_le_document_natif() -> None:
         PDF, document, [_region()], _config(), proposal_client=_proposal
     )
 
-    assert result.summary == {
+    assert {
+        key: result.summary[key]
+        for key in (
+            "status",
+            "regions",
+            "target_region_ids",
+            "targets",
+            "accepted",
+            "accepted_regions",
+            "rejected",
+            "failed",
+            "engine",
+        )
+    } == {
         "status": "corrected",
         "regions": 1,
         "target_region_ids": ["pdf-source:1:733"],
@@ -123,6 +137,9 @@ def test_cree_un_document_derive_sans_modifier_le_document_natif() -> None:
             "vision_calls": 0,
         },
     }
+    assert result.summary["supplements"] == 0
+    assert result.summary["development_operations"] == 1
+    assert len(result.summary["recipe_sha256"]) == 64
     assert document.texts[8].text == original_text
     assert document.texts[8].orig == original_orig
     derived = DoclingDocument.model_validate_json(result.document)
@@ -131,7 +148,9 @@ def test_cree_un_document_derive_sans_modifier_le_document_natif() -> None:
     assert derived.texts[8].text[83 : 83 + len(corrected)] == corrected
     assert derived.texts[8].orig == original_orig
     assert [item.model_dump() for item in derived.texts[8].prov] == original_provenance
-    assert result.markdown == derived.export_to_markdown().encode("utf-8")
+    assert result.markdown == render_developed_markdown(
+        derived, records["recipe"]["operations"]
+    )
     assert records["records"][0]["before"] == _region()["candidate_text"]
     assert records["records"][0]["proposals"][0]["selected_engine"] == (
         "deterministic_source"
@@ -158,6 +177,42 @@ def test_cree_un_document_derive_sans_modifier_le_document_natif() -> None:
     assert b"Spendings, M$." in result.html
     assert "$^{(2)}$" in derived.texts[8].text
     assert "$^{2}$" in derived.texts[8].text
+
+
+def test_ne_compte_pas_un_supplement_comme_correction_rejetee() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    region = {
+        "region_id": "pdf-source:1:missing",
+        "page": 1,
+        "bbox": [10.0, 20.0, 20.0, 30.0],
+        "source_glyph_text": "x",
+        "source_canonical_tokens": ["x"],
+        "source_tokens": ["x"],
+        "source_relation_signature": ["x"],
+        "candidate_status": "missing",
+        "candidate_link_status": "not_linked",
+        "candidate_link_reason": {"code": "docling_text_container_missing"},
+        "candidate_format": None,
+        "candidate_text": "",
+        "candidate_charspan": None,
+        "docling_ref": None,
+        "status": "traced",
+        "semantic_status": "established",
+        "verdict": "non_verifiable",
+        "glyph_sequence_indices": [1],
+    }
+
+    result = correct_document(
+        PDF, document, [region], _config(), proposal_client=_proposal
+    )
+
+    assert result.summary["regions"] == 0
+    assert result.summary["targets"] == 0
+    assert result.summary["rejected"] == 0
+    assert result.summary["supplements"] == 1
+    payload = json.loads(result.records)
+    assert payload["records"] == []
+    assert len(payload["supplements"]) == 1
     assert result.evidence.startswith(b"PK")
 
 
